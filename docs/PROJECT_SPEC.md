@@ -77,8 +77,9 @@ Default branch: main
 - Android 11+ speech recognition service query is declared.
 - Speech recognition errors are mapped to Bengali messages.
 - GitHub Actions debug APK workflow exists.
-- MainActivity currently replies only to a simple hello/হ্যালো greeting; the AI brain is not connected.
-- Current UI is a basic native layout, not the planned premium animated face.
+- MainActivity includes the premium dark/emerald UI, animated AssistantFaceView, Bengali SpeechRecognizer input, Android TextToSpeech fallback, and in-app Sleep/Wake controls.
+- The current reply logic is still rule-based; the AI brain is not connected.
+- Sleep mode currently cancels in-app recognition and disables the talk button; it is not a background service or system-wide microphone shutdown guarantee.
 - No ElevenLabs integration, custom voice, long-term memory, WhatsApp automation, notification reader, wake-word engine, or physical robot support is implemented yet.
 
 ## Next development sequence
@@ -90,7 +91,8 @@ Default branch: main
 - Rework UI in small, buildable steps.
 
 ### P1 — Premium RS interface
-- Create the app's visual design system and assistant face states.
+- Premium dark/emerald interface and animated face states have been implemented in the starter UI.
+- Verify the UI and Sleep/Wake behavior on Boss's Android phone; refine based on actual device feedback.
 - Keep the app buildable after each increment.
 
 ### P2 — AI conversation
@@ -135,3 +137,14 @@ Default branch: main
 - GitHub Actions Build #12 (run `44041397239`, checkpoint/docs update) completed successfully, including APK upload.
 - Device installation and real-phone testing remain pending.
 - Next step: build a small free voice-engine proof of concept, starting with Bangla quality and hardware benchmarking before integrating it into the RS app.
+
+
+### 2026-11-17 — Voice ownership and setup checkpoint
+- Boss confirmed the supplied voice recording is his own voice.
+- Boss has not created an ElevenLabs account yet.
+- Added `docs/VOICE_SETUP.md` with account setup steps, private voice-sample handling, secure credential rules, the planned Android-to-backend-to-ElevenLabs flow, fallback behavior, and outstanding tasks.
+- Voice cloning and ElevenLabs API integration are not implemented yet; waiting for the account, Voice ID, and a protected backend decision.
+- GitHub Actions build #11 (UI/avatar code) and build #12 (documentation checkpoint) both completed successfully, including APK build and artifact upload.
+- Repository write access was verified; default branch is `main`.
+- Next step for Boss: create the ElevenLabs account and create the voice privately. Share only the Voice ID later; never share the API key in chat or commit it.
+- Next development step: after the account/Voice ID is available, implement the protected backend and Android audio playback integration, retaining device TTS as a fallback.
