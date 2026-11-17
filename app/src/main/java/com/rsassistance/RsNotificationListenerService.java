@@ -1,14 +1,32 @@
 package com.rsassistance;
 
 import android.app.Notification;
+import android.speech.tts.TextToSpeech;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
+
+import java.util.Locale;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Stores notification previews only after Boss enables Android Notification Access. */
 public class RsNotificationListenerService extends NotificationListenerService {
+    private TextToSpeech speech;
+    private boolean speechReady = false;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        speech = new TextToSpeech(this, result -> {
+            if (result == TextToSpeech.SUCCESS && speech != null) {
+                int language = speech.setLanguage(new Locale("bn", "BD"));
+                speechReady = language != TextToSpeech.LANG_MISSING_DATA
+                        && language != TextToSpeech.LANG_NOT_SUPPORTED;
+            }
+        });
+    }
+
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (sbn == null || sbn.getPackageName() == null
@@ -31,6 +49,8 @@ public class RsNotificationListenerService extends NotificationListenerService {
         String body = textValue == null ? "" : textValue.toString().trim();
         if (title.isEmpty() && body.isEmpty()) return;
 
+        speakWhatsAppIfEnabled(sbn, title, body);
+
         try {
             android.content.SharedPreferences prefs =
                     getSharedPreferences("rs_notification_store", MODE_PRIVATE);
@@ -51,5 +71,34 @@ public class RsNotificationListenerService extends NotificationListenerService {
         } catch (Exception ignored) {
             // A malformed old cache should not crash Android's notification pipeline.
         }
+    }
+
+    private void speakWhatsAppIfEnabled(StatusBarNotification sbn, String title, String body) {
+        String packageName = sbn.getPackageName();
+        boolean whatsapp = "com.whatsapp".equals(packageName)
+                || "com.whatsapp.w4b".equals(packageName);
+        if (!whatsapp || body.isEmpty() || speech == null || !speechReady) return;
+
+        android.content.SharedPreferences prefs =
+                getSharedPreferences("rs_notification_store", MODE_PRIVATE);
+        if (!prefs.getBoolean("whatsapp_auto_read", false)) return;
+
+        String fingerprint = sbn.getKey() + "|" + title + "|" + body;
+        String previous = prefs.getString("last_spoken_fingerprint", "");
+        if (fingerprint.equals(previous)) return;
+        prefs.edit().putString("last_spoken_fingerprint", fingerprint).apply();
+
+        String spoken = title.isEmpty() ? body : title + " বলেছে, " + body;
+        speech.speak(spoken, TextToSpeech.QUEUE_ADD, null, "rs_whatsapp_notification");
+    }
+
+    @Override
+    public void onDestroy() {
+        if (speech != null) {
+            speech.stop();
+            speech.shutdown();
+            speech = null;
+        }
+        super.onDestroy();
     }
 }
