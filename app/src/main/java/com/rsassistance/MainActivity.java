@@ -7,6 +7,7 @@ import android.app.role.RoleManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.ComponentName;
+import android.net.Uri;
 import android.provider.Settings.Secure;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -53,6 +54,7 @@ public class MainActivity extends Activity {
     private boolean autoStartAfterAudioPermission = false;
     private boolean setupAfterAudioPermission = false;
     private String pendingCameraAction;
+    private String pendingWriteSettingsAction;
     private final ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
     @Override
@@ -535,6 +537,18 @@ public class MainActivity extends Activity {
         face.setEmotion(AssistantFaceView.Emotion.THINKING);
 
         RsActionController.Result action = RsActionController.execute(this, spoken);
+        if (action.needsWriteSettings) {
+            pendingWriteSettingsAction = spoken;
+            try {
+                Intent settings = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                        Uri.parse("package:" + getPackageName()));
+                startActivity(settings);
+                status.setText("Brightness নিয়ন্ত্রণের জন্য RS-কে Modify System Settings দিন, Boss।");
+            } catch (Exception e) {
+                status.setText("Modify System Settings permission page খুলতে পারলাম না।");
+            }
+            return;
+        }
         if (action.needsCameraPermission) {
             pendingCameraAction = spoken;
             requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION);
@@ -644,6 +658,11 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshAssistantSetupLabel();
+        if (pendingWriteSettingsAction != null && Settings.System.canWrite(this)) {
+            String action = pendingWriteSettingsAction;
+            pendingWriteSettingsAction = null;
+            handleSpeech(action);
+        }
     }
 
     @Override
