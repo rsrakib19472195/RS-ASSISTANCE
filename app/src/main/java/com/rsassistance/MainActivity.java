@@ -809,261 +809,61 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle("WhatsApp message পাঠাব?")
                 .setMessage("To: " + name + "\n\nMessage: " + message
-                        + "\n\nRS WhatsApp chat খুলবে। Send চাপার আগে আপনি message যাচাই করতে পারবেন।")
+                        + "\n\nআপনি Confirm করলে RS সঠিক WhatsApp chat ও message মিলিয়ে Send চাপার চেষ্টা করবে।")
                 .setNegativeButton("না", null)
-                .setPositiveButton("WhatsApp খুলুন", (dialog, which) -> {
+                .setPositiveButton("Confirm & Send", (dialog, which) -> {
+                    if (!isWhatsAppSendServiceEnabled()) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("WhatsApp Auto Send permission")
+                                .setMessage("একবার Android Accessibility Settings-এ RS WhatsApp Send চালু করুন। "
+                                        + "এটি শুধু আপনার Confirm করা WhatsApp message পাঠানোর জন্য ব্যবহৃত হবে। "
+                                        + "চালু করার পর একই command আবার বলুন।")
+                                .setNegativeButton("পরে", null)
+                                .setPositiveButton("Settings", (d, w) -> {
+                                    try {
+                                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                                    } catch (Exception e) {
+                                        status.setText("Accessibility Settings খুলতে পারলাম না, Boss।");
+                                    }
+                                }).show();
+                        return;
+                    }
                     try {
+                        JSONObject pending = new JSONObject();
+                        pending.put("recipient", name);
+                        pending.put("phone", phone);
+                        pending.put("message", message);
+                        pending.put("created_at", System.currentTimeMillis());
+                        getSharedPreferences("rs_notification_store", MODE_PRIVATE)
+                                .edit().putString("pending_whatsapp_send", pending.toString()).apply();
+
                         Uri uri = Uri.parse("https://wa.me/" + phone + "?text=" + Uri.encode(message));
                         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
                         intent.setPackage("com.whatsapp");
                         if (intent.resolveActivity(getPackageManager()) == null) {
+                            intent.setPackage("com.whatsapp.w4b");
+                        }
+                        if (intent.resolveActivity(getPackageManager()) == null) {
                             intent.setPackage(null);
                         }
                         startActivity(intent);
-                        status.setText(name + "-এর WhatsApp chat খুলে দিয়েছি, Boss। Send আপনাকেই চাপতে হবে।");
+                        status.setText(name + "-এর chat খুলেছি, Boss। RS message ও recipient মিলিয়ে Send করবে।");
                     } catch (Exception e) {
-                        status.setText("WhatsApp chat খুলতে পারলাম না, Boss।");
+                        getSharedPreferences("rs_notification_store", MODE_PRIVATE)
+                                .edit().remove("pending_whatsapp_send").apply();
+                        status.setText("WhatsApp message পাঠানোর চেষ্টা শুরু করতে পারলাম না, Boss।");
                     }
                 })
                 .show();
     }
 
-
-    private boolean handleOwnerQuestion(String spoken) {
-        String q = spoken == null ? "" : spoken.toLowerCase(Locale.ROOT);
-        if (containsAnyText(q, "who made you", "who created you", "who built you",
-                "who is your creator", "who is your developer", "developer ke",
-                "ke banaise", "ke banaiche", "ke banayse", "ke banayche", "ke banaycho", "ke toiri korse",
-                "ke toiri koreche", "ke toiri korse", "toke ke banayse",
-                "তোমাকে কে বানিয়েছে", "তোমাকে কে বানিয়েছে", "তোমাকে কে তৈরি করেছে",
-                "কে বানিয়েছে তোমাকে", "কে বানিয়েছে তোমাকে", "কে তৈরি করেছে")) {
-            respondLocally(spoken,
-                    "আমাকে তৈরি করেছে আমার Boss, RS RAKIB। তিনিই RS ASSISTANCE-এর owner এবং developer।");
-            return true;
-        }
-        if (containsAnyText(q, "about me", "what do you know about me", "who am i",
-                "amar somporke bolo", "amar somporke bolbe", "amar bepare bolo", "amar bepare bolbe", "amar porichoy dao",
-                "ami ke", "amake cheno", "আমার সম্পর্কে বল", "আমার সম্পর্কে বলবে", "আমার ব্যাপারে বল", "আমার ব্যাপারে বলবে",
-                "আমাকে চেনো", "আমি কে", "আমার পরিচয় দাও", "আমার পরিচয় দাও")) {
-            respondLocally(spoken,
-                    "Boss, আপনি RS RAKIB। আপনি RS ASSISTANCE-এর creator ও developer। "
-                    + "আপনি বাংলাদেশে থাকেন এবং Bangla ও Banglish-এ কথা বলেন। "
-                    + "আপনি Android app, AI assistant, web development—HTML, CSS, JavaScript—"
-                    + "এবং Free Fire esports ও নিজের digital projects নিয়ে কাজ করেন। "
-                    + "আপনার লক্ষ্য হলো RS-কে ধীরে ধীরে একটি দক্ষ personal AI assistant এবং ভবিষ্যতে robot-এ রূপ দেওয়া। "
-                    + "আপনার private information বা কোনো secret আমি অন্যের কাছে প্রকাশ করব না।");
-            return true;
-        }
-        if (containsAnyText(q, "amar nam ki", "what is my name", "আমার নাম কি",
-                "আমার নাম কী", "আমাকে কি নামে ডাকবে")) {
-            respondLocally(spoken, "আপনার নাম RS RAKIB, Boss। আমি আপনাকে Boss বলেই সম্বোধন করি।");
-            return true;
-        }
-        return false;
-    }
-
-    private void respondLocally(String spoken, String reply) {
-        addTurn("user", spoken);
-        addTurn("assistant", reply);
-        RsMemoryStore.save(this, conversationHistory);
-        status.setText("আপনি: " + spoken + "\n\nRS: " + reply);
-        face.setEmotion(AssistantFaceView.Emotion.HAPPY);
-        CartesiaTtsClient.speak(this, reply, detectSpeechLanguage(reply), tts, face, status);
-    }
-
-    private boolean handleNotificationQuestion(String spoken) {
-        String q = spoken == null ? "" : spoken.toLowerCase(Locale.ROOT);
-        boolean asksAboutMessages = containsAnyText(q,
-                "last message", "last msg", "recent message", "recent msg",
-                "who messaged", "what message", "what did", "message dise",
-                "msg dise", "msg ke dise", "message ke dise", "ki msg dise", "ke msg", "ke message", "ki message", "ki msg",
-                "msg ashche", "message ashche", "message asche", "msg asche",
-                "ke pathaise", "ke pathiyeche", "ki likheche", "ki likhse",
-                "whatsapp inbox", "show inbox", "read inbox",
-                "শেষ মেসেজ", "সর্বশেষ মেসেজ", "কে মেসেজ", "কি মেসেজ",
-                "কী মেসেজ", "মেসেজ এসেছে", "মেসেজ আসছে", "কে পাঠিয়েছে",
-                "কে পাঠিয়েছে", "কি লিখেছে", "কী লিখেছে", "কি বলেছে",
-                "কী বলেছে", "ইনবক্স দেখাও", "ইনবক্স পড়", "ইনবক্স পড়");
-        if (!asksAboutMessages) return false;
-
-        if (!hasNotificationAccess()) {
-            respondLocally(spoken,
-                    "Boss, incoming message কে পাঠিয়েছে বা কী লিখেছে তা জানার জন্য "
-                    + "প্রথমে Notification Access চালু করতে হবে। RS-এর Notification Access button চাপুন, "
-                    + "Settings-এ RS-কে Allow করুন।");
-            return true;
-        }
-
-        boolean whatsappOnly = containsAnyText(q, "whatsapp", "হোয়াটসঅ্যাপ", "হোয়াটসঅ্যাপ");
-        String raw = getSharedPreferences("rs_notification_store", MODE_PRIVATE)
-                .getString("items", "[]");
-        StringBuilder reply = new StringBuilder();
-        try {
-            JSONArray items = new JSONArray(raw);
-            int shown = 0;
-            for (int i = items.length() - 1; i >= 0 && shown < 6; i--) {
-                JSONObject item = items.optJSONObject(i);
-                if (item == null) continue;
-                String packageName = item.optString("package", "");
-                boolean whatsapp = "com.whatsapp".equals(packageName)
-                        || "com.whatsapp.w4b".equals(packageName);
-                if (whatsappOnly && !whatsapp) continue;
-                String title = item.optString("title", "").trim();
-                String body = item.optString("text", "").trim();
-                if (title.isEmpty() && body.isEmpty()) continue;
-                if (shown > 0) reply.append("\n\n");
-                if (!title.isEmpty()) reply.append(title);
-                if (!body.isEmpty()) {
-                    if (!title.isEmpty()) reply.append(" বলেছে: ");
-                    reply.append(body);
-                }
-                shown++;
-            }
-            if (shown == 0) {
-                reply.append(whatsappOnly
-                        ? "Boss, এখনো কোনো WhatsApp message notification সংরক্ষিত নেই। "
-                          + "নতুন message এলে এবং Notification Access চালু থাকলে RS জানতে পারবে।"
-                        : "Boss, এখনো পড়ার মতো কোনো message notification পাওয়া যায়নি। "
-                          + "Notification Access চালু থাকার পর আসা notification-গুলোই RS দেখতে পারে।");
-            } else {
-                reply.insert(0, whatsappOnly
-                        ? "সর্বশেষ পাওয়া WhatsApp message-গুলো:\n"
-                        : "সর্বশেষ পাওয়া message notification-গুলো:\n");
-            }
-        } catch (Exception e) {
-            reply.append("Boss, notification history পড়তে সমস্যা হয়েছে।");
-        }
-        respondLocally(spoken, reply.toString());
-        return true;
-    }
-
-    private static final class CallRequest {
-        final String contact;
-        CallRequest(String contact) { this.contact = contact; }
-    }
-
-    private boolean handleCallCommand(String spoken) {
-        CallRequest request = parseCallRequest(spoken);
-        if (request == null) return false;
-        if (checkSelfPermission(Manifest.permission.READ_CONTACTS)
-                != PackageManager.PERMISSION_GRANTED) {
-            pendingCallCommand = spoken;
-            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS},
-                    CONTACTS_PERMISSION);
-            status.setText("কাকে call করবেন তা খুঁজতে Contacts permission দিন, Boss।");
-            return true;
-        }
-        findCallRecipient(request);
-        return true;
-    }
-
-    private CallRequest parseCallRequest(String spoken) {
-        if (spoken == null) return null;
-        String q = spoken.trim();
-        Matcher english = Pattern.compile(
-                "(?i)^(?:please\\\\s+)?(?:call|phone|dial)\\\\s+(.+?)(?:\\\\s+now)?$"
-        ).matcher(q);
-        if (english.find()) return new CallRequest(english.group(1).trim());
-
-        Matcher banglish = Pattern.compile(
-                "(?i)^(.+?)\\\\s+ke\\\\s+(?:call|phone)\\\\s+(?:dao|daw|koro|korun)$"
-        ).matcher(q);
-        if (banglish.find()) return new CallRequest(banglish.group(1).trim());
-
-        Matcher bengali = Pattern.compile(
-                "(.+?)\\\\s*কে\\\\s*(?:কল|ফোন)\\\\s*(?:দাও|করো|করুন)$"
-        ).matcher(q);
-        if (bengali.find()) return new CallRequest(bengali.group(1).trim());
-        return null;
-    }
-
-    private void findCallRecipient(CallRequest request) {
-        ArrayList<String> names = new ArrayList<>();
-        ArrayList<String> numbers = new ArrayList<>();
-        Cursor cursor = null;
-        try {
-            String selection = ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ?";
-            cursor = getContentResolver().query(
-                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                    new String[]{ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                            ContactsContract.CommonDataKinds.Phone.NUMBER},
-                    selection, new String[]{"%" + request.contact + "%"},
-                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC");
-            if (cursor != null) {
-                while (cursor.moveToNext() && names.size() < 20) {
-                    String name = cursor.getString(0);
-                    String number = cursor.getString(1);
-                    if (name != null && number != null && !number.trim().isEmpty()
-                            && !numbers.contains(number)) {
-                        names.add(name);
-                        numbers.add(number);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            respondLocally("call " + request.contact,
-                    "Boss, Contacts থেকে phone number পড়তে পারিনি। Permission পরীক্ষা করুন।");
-            return;
-        } finally {
-            if (cursor != null) cursor.close();
-        }
-        if (names.isEmpty()) {
-            respondLocally("call " + request.contact,
-                    "Boss, '" + request.contact + "' নামে কোনো phone contact খুঁজে পেলাম না।");
-        } else if (names.size() == 1) {
-            confirmCall(names.get(0), numbers.get(0));
-        } else {
-            String[] choices = names.toArray(new String[0]);
-            new AlertDialog.Builder(this).setTitle("কাকে call করবেন?")
-                    .setItems(choices, (dialog, which) ->
-                            confirmCall(names.get(which), numbers.get(which)))
-                    .setNegativeButton("Cancel", null).show();
-        }
-    }
-
-    private void confirmCall(String name, String number) {
-        new AlertDialog.Builder(this)
-                .setTitle(name + "-কে call করবেন?")
-                .setMessage("আপনি Confirm করলে RS call শুরু করবে।\n" + number)
-                .setNegativeButton("না", null)
-                .setPositiveButton("Call Now", (dialog, which) -> {
-                    pendingCallName = name;
-                    pendingCallNumber = number;
-                    if (checkSelfPermission(Manifest.permission.CALL_PHONE)
-                            != PackageManager.PERMISSION_GRANTED) {
-                        requestPermissions(new String[]{Manifest.permission.CALL_PHONE},
-                                CALL_PERMISSION);
-                    } else {
-                        placePendingCall();
-                    }
-                }).show();
-    }
-
-    private void placePendingCall() {
-        String name = pendingCallName;
-        String number = pendingCallNumber;
-        pendingCallName = null;
-        pendingCallNumber = null;
-        if (number == null || number.trim().isEmpty()) return;
-        try {
-            Intent call = new Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null));
-            startActivity(call);
-            status.setText((name == null ? "Call" : name + "-কে call") + " শুরু করেছি, Boss।");
-        } catch (SecurityException e) {
-            status.setText("Direct call permission পাওয়া যায়নি। Dialer খুলছি, Boss।");
-            try {
-                startActivity(new Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)));
-            } catch (Exception ignored) {}
-        } catch (Exception e) {
-            status.setText("এই মুহূর্তে call শুরু করতে পারলাম না, Boss।");
-        }
-    }
-
-    private static boolean containsAnyText(String value, String... parts) {
-        for (String part : parts) {
-            if (value.contains(part)) return true;
-        }
-        return false;
+    private boolean isWhatsAppSendServiceEnabled() {
+        String enabled = Secure.getString(getContentResolver(),
+                Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (enabled == null) return false;
+        String expected = new ComponentName(this,
+                RsWhatsAppSendAccessibilityService.class).flattenToString();
+        return enabled.toLowerCase(Locale.ROOT).contains(expected.toLowerCase(Locale.ROOT));
     }
 
     private void addTurn(String role, String content) {
