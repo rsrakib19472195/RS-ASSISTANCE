@@ -47,12 +47,16 @@ Last updated: 2026-11-17
 - [x] Instant Voice Clone generated (reported by Boss).
 - [x] Generated sample audio shared by Boss.
 - [x] Free-first policy documented.
-- [ ] Cartesia Voice ID confirmed.
-- [ ] Bengali, English, and Hindi tested with the same clone.
+- [x] Cartesia Voice ID received from Boss (kept out of this public repository).
+- [x] Boss reports the same clone sounds perfect in Bengali, English, and Hindi.
 - [ ] Account free API access and remaining credits verified.
 - [ ] Protected backend selected, implemented, and deployed.
 - [ ] Android remote-audio playback integrated.
 - [ ] Real-device voice test completed.
+
+## Confirmed voice
+- Voice ID was supplied by Boss in chat. It is intentionally not stored in this public repository; configure it as a private Worker secret named `RS_CARTESIA_VOICE_ID`.
+- Boss reports successful, satisfactory tests in Bengali, English, and Hindi. This is a user-reported result, not an independent device/API verification.
 
 ## Current Android fallback
 The Android app currently uses the platform TextToSpeech engine. Cartesia is not yet connected. Keep the fallback until the protected backend and real-device tests pass.
