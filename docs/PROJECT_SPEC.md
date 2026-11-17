@@ -27,7 +27,10 @@ Last updated: 2026-11-17
 - Research candidates for a later custom-voice prototype: `HayaiTTS` / sherpa-onnx for on-device TTS and supported ZipVoice/Pocket cloning paths; local Bengali cloning experiments such as Chatterbox-Bangla / XTTS-based projects. These are candidates only, not yet integrated or verified on Boss's phone. Check each model's license, Bengali quality, RAM/storage needs, and device performance before adoption.
 - Prefer on-device/offline inference where practical. A free/open-source model may still require a capable PC for setup or model preparation; no promise of high-quality real-time cloning on the phone until tested.
 - Emotion-aware delivery: vary tone, pace, and expression appropriately without faking feelings or making manipulative claims.
-- Support Bangla first, plus English and Hindi where the chosen model supports them.
+- Same cloned speaker identity across Bangla, English, and Hindi is a core requirement: RS must sound like Boss in all three languages, not switch to unrelated stock voices.
+- First multilingual model candidate: Maya 2 Native, whose published language list includes Bengali, English, and Hindi and describes cross-lingual voice cloning. It is a candidate for proof-of-concept, not yet integrated or tested. Its published model size is about 2.5B parameters / ~5 GB BF16 weights, so assume a local PC/server is needed initially; do not promise direct Android inference until benchmarked.
+- Chatterbox Multilingual is not the primary candidate because its published general model language list does not include Bengali.
+- Prefer one local/offline inference service on a PC or self-hosted machine during development, with the Android app connecting over the user's own network; later investigate quantization/on-device deployment. No paid API key is required for this proof-of-concept.
 - Never commit API keys or private credentials to the repository. Avoid paid credentials entirely unless Boss later changes the zero-cost requirement.
 
 ## Face and interface
@@ -113,7 +116,7 @@ Default branch: main
 ## Inputs needed from Boss (do not block initial UI/spec work)
 - Voice ownership confirmed: `RS ESPORT.mp3` is Boss's own voice. No further ownership confirmation needed for this file.
 - ElevenLabs is not part of the plan. Do not request an ElevenLabs Voice ID or API key.
-- Choose a free/open-source AI brain later; prioritize local/free tiers and clearly disclose any usage limits.
+- No API keys are needed for the initial local voice proof-of-concept. For the AI brain, first assess local open models and hardware; only ask Boss for a provider key if a later optional hosted provider is chosen.
 - Test APKs on the target Android phone and report actual results.
 
 
@@ -148,3 +151,12 @@ Default branch: main
 - Repository write access was verified; default branch is `main`.
 - Next step for Boss: create the ElevenLabs account and create the voice privately. Share only the Voice ID later; never share the API key in chat or commit it.
 - Next development step: after the account/Voice ID is available, implement the protected backend and Android audio playback integration, retaining device TTS as a fallback.
+
+
+### 2026-11-17 — Multilingual same-voice requirement
+- Boss confirmed RS must speak Bangla, English, and Hindi in the same cloned voice identity.
+- Researched candidate Maya 2 Native: published model card lists Bengali (`bn`), English (`en`), Hindi (`hi`), zero-shot/cross-lingual cloning, Apache-2.0, and about 2.5B parameters / 5 GB BF16 weights. This is promising but not yet tested; its size suggests initial inference on a PC/self-hosted machine rather than directly on the Android handset.
+- Chatterbox Multilingual was not selected because its published general multilingual language list omits Bengali.
+- Initial architecture direction: Android RS app + local/self-hosted inference service for voice and later AI, with no paid API dependency. Do not expose a public unauthenticated server; protect any LAN endpoint and keep the voice reference local/private.
+- No API key or payment is required from Boss now. Needed later: the actual `RS ESPORT.mp3` file accessible in the active project workspace (re-upload only if unavailable), plus access to a PC/laptop for model setup/testing if the Android phone cannot run the model efficiently. Boss's phone model is Motorola G57 Power; verify exact RAM/storage and Android compatibility before deployment.
+- Next: inspect available project audio asset, build a minimal multilingual voice proof-of-concept on a suitable local machine, test Bangla/English/Hindi with the same reference voice, then design Android integration. No model is marked complete until audio quality and performance are tested.
