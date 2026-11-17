@@ -21,11 +21,14 @@ Last updated: 2026-11-17
 - Ask for confirmation before consequential actions such as sending messages, deleting data, making purchases, or changing security settings.
 
 ## Voice and emotion
-- User wants a distinct human-like voice using ElevenLabs, with the supplied audio file as a voice reference.
-- Use only a voice the user owns or is authorized to clone/use. Confirm ownership/permission before cloning.
+- Boss confirmed on 2026-11-17 that the supplied `RS ESPORT.mp3` is his own voice and may be used for voice cloning.
+- Boss explicitly rejected ElevenLabs and paid voice services. Project requirement: build with free/open-source tools and avoid paid subscriptions or per-request APIs.
+- Temporary voice output: Android's built-in TextToSpeech (free, device-provided; voice quality and offline availability depend on the installed engine/language pack).
+- Research candidates for a later custom-voice prototype: `HayaiTTS` / sherpa-onnx for on-device TTS and supported ZipVoice/Pocket cloning paths; local Bengali cloning experiments such as Chatterbox-Bangla / XTTS-based projects. These are candidates only, not yet integrated or verified on Boss's phone. Check each model's license, Bengali quality, RAM/storage needs, and device performance before adoption.
+- Prefer on-device/offline inference where practical. A free/open-source model may still require a capable PC for setup or model preparation; no promise of high-quality real-time cloning on the phone until tested.
 - Emotion-aware delivery: vary tone, pace, and expression appropriately without faking feelings or making manipulative claims.
-- Support Bangla first, plus English and Hindi where the chosen voice/model supports them.
-- Never commit API keys or private credentials to the repository. Store secrets in GitHub Actions Secrets or a protected backend.
+- Support Bangla first, plus English and Hindi where the chosen model supports them.
+- Never commit API keys or private credentials to the repository. Avoid paid credentials entirely unless Boss later changes the zero-cost requirement.
 
 ## Face and interface
 - Premium, unique, attractive animated assistant face/avatar.
@@ -45,7 +48,7 @@ Last updated: 2026-11-17
 ## Capabilities roadmap
 1. Android app foundation and polished UI.
 2. AI brain: natural-language understanding, online AI provider integration, graceful offline fallback.
-3. ElevenLabs voice integration and expressive speech.
+3. Free/open-source custom voice integration and expressive speech (no ElevenLabs).
 4. Personal memory: user profile, preferences, projects, people introduced by Boss, and user-controlled forget/delete flow.
 5. Android actions: open apps, flashlight, volume, brightness, alarms/reminders, battery status, and supported settings.
 6. WhatsApp workflow: identify recipient, draft message, read it back, ask Boss to confirm, then send using an Android-supported and policy-compliant method where available.
@@ -94,8 +97,10 @@ Default branch: main
 - Add a protected backend/API integration; do not embed provider secrets in the APK.
 - Add Bangla-first language handling with English/Hindi selection or detection.
 
-### P3 — Voice and modes
-- Integrate authorized ElevenLabs voice through a protected service.
+### P3 — Free voice and modes
+- Keep Android TextToSpeech as the initial zero-cost fallback.
+- Evaluate an open-source local TTS/voice-cloning engine; first test Bengali output and model license on a development machine, then benchmark Android integration.
+- Add Boss's own voice reference only to the selected authorized model; do not upload it to a third-party hosted service without a new explicit decision.
 - Add Active/Sleep/Off controls and Android-compliant foreground service behavior.
 
 ### P4 — Memory and Android integrations
@@ -104,9 +109,9 @@ Default branch: main
 - Add WhatsApp draft/confirmation/send workflow where supported.
 
 ## Inputs needed from Boss (do not block initial UI/spec work)
-- Confirm that the supplied voice recording is Boss's own voice or that Boss has permission to use it for voice cloning. If not, use a licensed voice.
-- Later provide an ElevenLabs Voice ID and configure the API key privately in GitHub Secrets or a backend secret store. Never paste the API key into chat or commit it.
-- Later choose an AI provider/model and supply its credentials privately if needed.
+- Voice ownership confirmed: `RS ESPORT.mp3` is Boss's own voice. No further ownership confirmation needed for this file.
+- ElevenLabs is not part of the plan. Do not request an ElevenLabs Voice ID or API key.
+- Choose a free/open-source AI brain later; prioritize local/free tiers and clearly disclose any usage limits.
 - Test APKs on the target Android phone and report actual results.
 
 
@@ -119,3 +124,14 @@ Default branch: main
 - The existing Android SpeechRecognizer and device TTS remain as temporary prototype components; ElevenLabs and the AI brain are not connected.
 - GitHub Actions build for commit `9434c0a87986121c67696b2629813615c2444d2b` is running; do not mark the build successful until GitHub reports success.
 - Next checkpoint: verify the build, install on Boss's Android phone, inspect the new face/UI and Sleep/Wake behavior, then proceed with modular AI/backend and voice integration.
+
+
+### 2026-11-17 — Voice decision and build verification
+- Boss confirmed `RS ESPORT.mp3` is his own voice.
+- Boss chose a zero-paid-services policy for the full RS project and explicitly declined ElevenLabs.
+- Voice plan changed: use Android built-in TTS as the immediate free fallback; research and prototype open-source on-device/local voice cloning for Boss's own voice.
+- Initial research candidates: HayaiTTS/sherpa-onnx (Android offline TTS with selected cloning-capable model families), and Bengali-capable local pipelines such as Chatterbox-Bangla / XTTS-based projects. None is integrated or device-verified yet; licenses, quality, memory use, and Motorola compatibility must be checked.
+- GitHub Actions Build #11 (run `44041333269`, UI/avatar code) completed successfully, including APK upload.
+- GitHub Actions Build #12 (run `44041397239`, checkpoint/docs update) completed successfully, including APK upload.
+- Device installation and real-phone testing remain pending.
+- Next step: build a small free voice-engine proof of concept, starting with Bangla quality and hardware benchmarking before integrating it into the RS app.
