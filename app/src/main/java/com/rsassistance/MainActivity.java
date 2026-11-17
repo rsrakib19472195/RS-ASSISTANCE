@@ -2,43 +2,56 @@ package com.rsassistance;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.role.RoleManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.RecognitionListener;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
+    public static final String EXTRA_START_LISTENING = "rs_start_listening";
     private static final int AUDIO_PERMISSION = 41;
+    private static final int CAMERA_PERMISSION = 42;
+    private static final int ROLE_REQUEST = 43;
 
     private TextView status;
     private TextView modeLabel;
     private Button talkButton;
     private Button modeButton;
+    private Button setupButton;
     private AssistantFaceView face;
     private SpeechRecognizer recognizer;
     private TextToSpeech tts;
     private boolean sleeping = false;
+    private boolean autoStartAfterAudioPermission = false;
+    private boolean setupAfterAudioPermission = false;
+    private String pendingCameraAction;
     private final ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        conversationHistory.addAll(RsMemoryStore.load(this));
         getWindow().setStatusBarColor(Color.rgb(5, 17, 16));
         getWindow().setNavigationBarColor(Color.rgb(5, 17, 16));
         buildScreen();
@@ -75,13 +88,16 @@ public class MainActivity extends Activity {
         initializeSpeechRecognizer();
         if (recognizer == null) {
             status.setText("এই ডিভাইসে Speech Recognition পাওয়া যায়নি।");
+        } else if (getIntent().getBooleanExtra(EXTRA_START_LISTENING, false)) {
+            startListening();
         }
+        refreshAssistantSetupLabel();
     }
 
     private void buildScreen() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22), dp(20), dp(22), dp(18));
+        root.setPadding(dp(22), dp(16), dp(22), dp(14));
         root.setBackgroundColor(Color.rgb(5, 17, 16));
 
         LinearLayout header = new LinearLayout(this);
@@ -103,12 +119,12 @@ public class MainActivity extends Activity {
         subtitle.setGravity(Gravity.CENTER);
         header.addView(subtitle);
         root.addView(header, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(68)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(62)));
 
         face = new AssistantFaceView(this);
         LinearLayout.LayoutParams faceParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        faceParams.topMargin = dp(8);
+        faceParams.topMargin = dp(6);
         faceParams.bottomMargin = dp(4);
         root.addView(face, faceParams);
 
@@ -125,7 +141,7 @@ public class MainActivity extends Activity {
         status.setTextSize(14);
         status.setTextColor(Color.rgb(169, 197, 187));
         status.setGravity(Gravity.CENTER);
-        status.setPadding(dp(8), dp(10), dp(8), dp(14));
+        status.setPadding(dp(8), dp(8), dp(8), dp(10));
         root.addView(status);
 
         modeLabel = new TextView(this);
@@ -138,7 +154,7 @@ public class MainActivity extends Activity {
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         controls.setGravity(Gravity.CENTER);
-        controls.setPadding(0, dp(12), 0, 0);
+        controls.setPadding(0, dp(10), 0, 0);
 
         talkButton = new Button(this);
         talkButton.setText("🎙  কথা বলুন");
@@ -148,7 +164,7 @@ public class MainActivity extends Activity {
         talkButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         talkButton.setBackground(rounded(0xFF73F2C2, dp(18)));
         talkButton.setOnClickListener(v -> startListening());
-        LinearLayout.LayoutParams talkParams = new LinearLayout.LayoutParams(0, dp(54), 1f);
+        LinearLayout.LayoutParams talkParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
         talkParams.rightMargin = dp(8);
         controls.addView(talkButton, talkParams);
 
@@ -159,10 +175,38 @@ public class MainActivity extends Activity {
         modeButton.setAllCaps(false);
         modeButton.setBackground(rounded(0xFF183A34, dp(18)));
         modeButton.setOnClickListener(v -> toggleSleepMode());
-        LinearLayout.LayoutParams modeParams = new LinearLayout.LayoutParams(0, dp(54), 1f);
+        LinearLayout.LayoutParams modeParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
         modeParams.leftMargin = dp(8);
         controls.addView(modeButton, modeParams);
         root.addView(controls);
+
+        LinearLayout setupControls = new LinearLayout(this);
+        setupControls.setOrientation(LinearLayout.HORIZONTAL);
+        setupControls.setGravity(Gravity.CENTER);
+        setupControls.setPadding(0, dp(6), 0, 0);
+
+        setupButton = new Button(this);
+        setupButton.setText("Default Assistant সেটআপ");
+        setupButton.setTextColor(Color.WHITE);
+        setupButton.setTextSize(12);
+        setupButton.setAllCaps(false);
+        setupButton.setBackground(rounded(0xFF245448, dp(16)));
+        setupButton.setOnClickListener(v -> requestAssistantSetup());
+        LinearLayout.LayoutParams setupParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        setupParams.rightMargin = dp(6);
+        setupControls.addView(setupButton, setupParams);
+
+        Button clearButton = new Button(this);
+        clearButton.setText("Memory মুছুন");
+        clearButton.setTextColor(Color.WHITE);
+        clearButton.setTextSize(12);
+        clearButton.setAllCaps(false);
+        clearButton.setBackground(rounded(0xFF49312E, dp(16)));
+        clearButton.setOnClickListener(v -> confirmClearMemory());
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        clearParams.leftMargin = dp(6);
+        setupControls.addView(clearButton, clearParams);
+        root.addView(setupControls);
 
         setContentView(root);
     }
@@ -239,6 +283,7 @@ public class MainActivity extends Activity {
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
+            autoStartAfterAudioPermission = true;
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION);
             return;
         }
@@ -253,6 +298,66 @@ public class MainActivity extends Activity {
         } catch (IllegalStateException exception) {
             status.setText("ভয়েস সিস্টেম ব্যস্ত। একটু পরে চেষ্টা করুন।");
         }
+    }
+
+    private void requestAssistantSetup() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            setupAfterAudioPermission = true;
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION);
+            status.setText("RS-এর ভয়েস ব্যবহারের জন্য Microphone permission দিন, Boss।");
+            return;
+        }
+        requestDefaultAssistantRole();
+    }
+
+    private void requestDefaultAssistantRole() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            RoleManager roleManager = getSystemService(RoleManager.class);
+            if (roleManager == null || !roleManager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)) {
+                status.setText("এই Android সংস্করণে Default Assistant role পাওয়া যাচ্ছে না।");
+                return;
+            }
+            if (roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
+                status.setText("RS ইতিমধ্যেই আপনার Default Assistant, Boss।");
+                refreshAssistantSetupLabel();
+                return;
+            }
+            startActivityForResult(
+                    roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),
+                    ROLE_REQUEST);
+        } else {
+            try {
+                startActivity(new Intent(Settings.ACTION_VOICE_INPUT_SETTINGS));
+            } catch (Exception e) {
+                status.setText("এই ফোনে Voice Assistant settings খুলতে পারলাম না।");
+            }
+        }
+    }
+
+    private void refreshAssistantSetupLabel() {
+        if (setupButton == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            RoleManager roleManager = getSystemService(RoleManager.class);
+            if (roleManager != null && roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
+                setupButton.setText("RS Default Assistant ✓");
+                return;
+            }
+        }
+        setupButton.setText("Default Assistant সেটআপ");
+    }
+
+    private void confirmClearMemory() {
+        new AlertDialog.Builder(this)
+                .setTitle("RS Memory মুছবেন?")
+                .setMessage("এই ফোনে সংরক্ষিত কথোপকথনের ইতিহাস মুছে যাবে।")
+                .setNegativeButton("না", null)
+                .setPositiveButton("মুছে ফেলুন", (dialog, which) -> {
+                    conversationHistory.clear();
+                    RsMemoryStore.clear(this);
+                    status.setText("আপনার local conversation memory মুছে দিয়েছি, Boss।");
+                })
+                .show();
     }
 
     private void toggleSleepMode() {
@@ -279,8 +384,25 @@ public class MainActivity extends Activity {
     }
 
     private void handleSpeech(String spoken) {
-        status.setText("আপনি: " + spoken + "\n\nRS: ভাবছি, Boss…");
+        status.setText("আপনি: " + spoken + "\n\nRS: বুঝছি, Boss…");
         face.setEmotion(AssistantFaceView.Emotion.THINKING);
+
+        RsActionController.Result action = RsActionController.execute(this, spoken);
+        if (action.needsCameraPermission) {
+            pendingCameraAction = spoken;
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION);
+            status.setText("ফ্ল্যাশলাইট ব্যবহারের জন্য Camera permission প্রয়োজন, Boss।");
+            return;
+        }
+        if (action.handled) {
+            addTurn("user", spoken);
+            addTurn("assistant", action.message);
+            RsMemoryStore.save(this, conversationHistory);
+            status.setText("আপনি: " + spoken + "\n\nRS: " + action.message);
+            face.setEmotion(AssistantFaceView.Emotion.HAPPY);
+            CartesiaTtsClient.speak(this, action.message, "bn", tts, face, status);
+            return;
+        }
 
         JSONArray history = new JSONArray();
         int start = Math.max(0, conversationHistory.size() - 8);
@@ -288,25 +410,13 @@ public class MainActivity extends Activity {
             history.put(conversationHistory.get(i));
         }
 
-        try {
-            JSONObject userTurn = new JSONObject();
-            userTurn.put("role", "user");
-            userTurn.put("content", spoken);
-            conversationHistory.add(userTurn);
-        } catch (Exception ignored) {}
+        addTurn("user", spoken);
+        RsMemoryStore.save(this, conversationHistory);
 
         RsBrainClient.ask(this, spoken, history, new RsBrainClient.Callback() {
             @Override public void onSuccess(String reply) {
-                try {
-                    JSONObject assistantTurn = new JSONObject();
-                    assistantTurn.put("role", "assistant");
-                    assistantTurn.put("content", reply);
-                    conversationHistory.add(assistantTurn);
-                    while (conversationHistory.size() > 16) {
-                        conversationHistory.remove(0);
-                    }
-                } catch (Exception ignored) {}
-
+                addTurn("assistant", reply);
+                RsMemoryStore.save(MainActivity.this, conversationHistory);
                 status.setText("আপনি: " + spoken + "\n\nRS: " + reply);
                 face.setEmotion(AssistantFaceView.Emotion.HAPPY);
                 CartesiaTtsClient.speak(
@@ -316,6 +426,8 @@ public class MainActivity extends Activity {
 
             @Override public void onError(String message) {
                 String reply = "দুঃখিত Boss, এই মুহূর্তে আমার Brain-এর সঙ্গে সংযোগ হচ্ছে না। একটু পরে আবার চেষ্টা করুন।";
+                addTurn("assistant", reply);
+                RsMemoryStore.save(MainActivity.this, conversationHistory);
                 status.setText("আপনি: " + spoken + "\n\nRS: " + reply + "\n" + message);
                 face.setEmotion(AssistantFaceView.Emotion.CONCERNED);
                 CartesiaTtsClient.speak(
@@ -323,6 +435,70 @@ public class MainActivity extends Activity {
                 );
             }
         });
+    }
+
+    private void addTurn(String role, String content) {
+        try {
+            JSONObject turn = new JSONObject();
+            turn.put("role", role);
+            turn.put("content", content);
+            conversationHistory.add(turn);
+            while (conversationHistory.size() > 24) conversationHistory.remove(0);
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (requestCode == AUDIO_PERMISSION) {
+            if (granted) {
+                status.setText("Microphone permission পাওয়া গেছে, Boss।");
+                if (setupAfterAudioPermission) {
+                    setupAfterAudioPermission = false;
+                    requestDefaultAssistantRole();
+                } else if (autoStartAfterAudioPermission) {
+                    autoStartAfterAudioPermission = false;
+                    startListening();
+                }
+            } else {
+                setupAfterAudioPermission = false;
+                autoStartAfterAudioPermission = false;
+                status.setText("Microphone permission ছাড়া voice assistant কাজ করবে না।");
+            }
+        } else if (requestCode == CAMERA_PERMISSION) {
+            String action = pendingCameraAction;
+            pendingCameraAction = null;
+            if (granted && action != null) {
+                handleSpeech(action);
+            } else {
+                status.setText("Camera permission দেওয়া হয়নি, তাই flashlight চালাতে পারছি না।");
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == ROLE_REQUEST) {
+            refreshAssistantSetupLabel();
+            if (resultCode == RESULT_OK) {
+                status.setText("RS-কে Default Assistant হিসেবে নির্বাচন করেছেন, Boss।");
+            } else {
+                status.setText("Default Assistant পরিবর্তন করা হয়নি। চাইলে পরে সেটআপ করতে পারবেন।");
+            }
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra(EXTRA_START_LISTENING, false)) {
+            startListening();
+        }
     }
 
     private GradientDrawable rounded(int color, int radius) {
@@ -334,20 +510,6 @@ public class MainActivity extends Activity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                                           int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == AUDIO_PERMISSION) {
-            if (grantResults.length > 0
-                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                status.setText("অনুমতি পাওয়া গেছে। আবার মাইক্রোফোন চাপুন, Boss।");
-            } else {
-                status.setText("মাইক্রোফোন অনুমতি ছাড়া ভয়েস ইনপুট ব্যবহার করা যাবে না।");
-            }
-        }
     }
 
     @Override
