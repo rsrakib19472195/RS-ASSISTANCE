@@ -6,6 +6,8 @@ import android.app.AlertDialog;
 import android.app.role.RoleManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.ComponentName;
+import android.provider.Settings.Secure;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -33,12 +35,16 @@ public class MainActivity extends Activity {
     private static final int AUDIO_PERMISSION = 41;
     private static final int CAMERA_PERMISSION = 42;
     private static final int ROLE_REQUEST = 43;
+    private static final int CORE_PERMISSIONS = 44;
 
     private TextView status;
     private TextView modeLabel;
     private Button talkButton;
     private Button modeButton;
     private Button setupButton;
+    private Button permissionsButton;
+    private Button notificationButton;
+    private Button inboxButton;
     private AssistantFaceView face;
     private SpeechRecognizer recognizer;
     private TextToSpeech tts;
@@ -92,6 +98,7 @@ public class MainActivity extends Activity {
             startListening();
         }
         refreshAssistantSetupLabel();
+        requestCorePermissions();
     }
 
     private void buildScreen() {
@@ -208,6 +215,49 @@ public class MainActivity extends Activity {
         setupControls.addView(clearButton, clearParams);
         root.addView(setupControls);
 
+        LinearLayout accessControls = new LinearLayout(this);
+        accessControls.setOrientation(LinearLayout.HORIZONTAL);
+        accessControls.setGravity(Gravity.CENTER);
+        accessControls.setPadding(0, dp(6), 0, 0);
+
+        permissionsButton = new Button(this);
+        permissionsButton.setText("সব Permission");
+        permissionsButton.setTextColor(Color.WHITE);
+        permissionsButton.setTextSize(11);
+        permissionsButton.setAllCaps(false);
+        permissionsButton.setBackground(rounded(0xFF245448, dp(14)));
+        permissionsButton.setOnClickListener(v -> requestCorePermissions());
+        LinearLayout.LayoutParams permissionsParams =
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
+        permissionsParams.rightMargin = dp(4);
+        accessControls.addView(permissionsButton, permissionsParams);
+
+        notificationButton = new Button(this);
+        notificationButton.setText("Notification Access");
+        notificationButton.setTextColor(Color.WHITE);
+        notificationButton.setTextSize(10);
+        notificationButton.setAllCaps(false);
+        notificationButton.setBackground(rounded(0xFF245448, dp(14)));
+        notificationButton.setOnClickListener(v -> requestNotificationAccess());
+        LinearLayout.LayoutParams notificationParams =
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
+        notificationParams.leftMargin = dp(4);
+        notificationParams.rightMargin = dp(4);
+        accessControls.addView(notificationButton, notificationParams);
+
+        inboxButton = new Button(this);
+        inboxButton.setText("Inbox");
+        inboxButton.setTextColor(Color.WHITE);
+        inboxButton.setTextSize(11);
+        inboxButton.setAllCaps(false);
+        inboxButton.setBackground(rounded(0xFF183A34, dp(14)));
+        inboxButton.setOnClickListener(v -> showCapturedNotifications());
+        LinearLayout.LayoutParams inboxParams =
+                new LinearLayout.LayoutParams(0, dp(44), 0.75f);
+        inboxParams.leftMargin = dp(4);
+        accessControls.addView(inboxButton, inboxParams);
+        root.addView(accessControls);
+
         setContentView(root);
     }
 
@@ -301,14 +351,76 @@ public class MainActivity extends Activity {
     }
 
     private void requestAssistantSetup() {
+        requestCorePermissions();
+    }
+
+    private void requestCorePermissions() {
+        ArrayList<String> missing = new ArrayList<>();
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
-            setupAfterAudioPermission = true;
-            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION);
-            status.setText("RS-এর ভয়েস ব্যবহারের জন্য Microphone permission দিন, Boss।");
-            return;
+            missing.add(Manifest.permission.RECORD_AUDIO);
         }
-        requestDefaultAssistantRole();
+        if (checkSelfPermission(Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.CAMERA);
+        }
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+
+        if (!missing.isEmpty()) {
+            status.setText("RS-এর Voice, Flashlight ও notification-এর জন্য প্রয়োজনীয় permission দিন, Boss।");
+            requestPermissions(missing.toArray(new String[0]), CORE_PERMISSIONS);
+        } else {
+            status.setText("প্রাথমিক permission দেওয়া আছে। Default Assistant সেটআপ করছি…");
+            requestDefaultAssistantRole();
+        }
+    }
+
+    private void requestNotificationAccess() {
+        try {
+            startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+            status.setText("Notification Access settings-এ RS-কে Allow করুন, Boss।");
+        } catch (Exception e) {
+            status.setText("এই ফোনে Notification Access settings খুলতে পারলাম না।");
+        }
+    }
+
+    private boolean hasNotificationAccess() {
+        String enabled = Secure.getString(getContentResolver(), "enabled_notification_listeners");
+        return enabled != null && enabled.contains(
+                new ComponentName(this, RsNotificationListenerService.class).flattenToString());
+    }
+
+    private void showCapturedNotifications() {
+        String raw = getSharedPreferences("rs_notification_store", MODE_PRIVATE)
+                .getString("items", "[]");
+        try {
+            JSONArray items = new JSONArray(raw);
+            StringBuilder message = new StringBuilder();
+            int start = Math.max(0, items.length() - 12);
+            for (int i = items.length() - 1; i >= start; i--) {
+                JSONObject item = items.optJSONObject(i);
+                if (item == null) continue;
+                String title = item.optString("title", "Notification");
+                String body = item.optString("text", "");
+                message.append(title).append("\n").append(body).append("\n\n");
+            }
+            if (message.length() == 0) {
+                message.append(hasNotificationAccess()
+                        ? "এখনো কোনো নতুন notification পাওয়া যায়নি।"
+                        : "প্রথমে Notification Access চালু করুন।");
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("RS Notification Inbox")
+                    .setMessage(message.toString())
+                    .setPositiveButton("ঠিক আছে", null)
+                    .show();
+        } catch (Exception e) {
+            status.setText("Notification inbox পড়তে সমস্যা হয়েছে।");
+        }
     }
 
     private void requestDefaultAssistantRole() {
@@ -337,6 +449,10 @@ public class MainActivity extends Activity {
 
     private void refreshAssistantSetupLabel() {
         if (setupButton == null) return;
+        if (notificationButton != null) {
+            notificationButton.setText(hasNotificationAccess()
+                    ? "Notification ✓" : "Notification Access");
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             RoleManager roleManager = getSystemService(RoleManager.class);
             if (roleManager != null && roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
@@ -464,7 +580,10 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         boolean granted = grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-        if (requestCode == AUDIO_PERMISSION) {
+        if (requestCode == CORE_PERMISSIONS) {
+            refreshAssistantSetupLabel();
+            requestDefaultAssistantRole();
+        } else if (requestCode == AUDIO_PERMISSION) {
             if (granted) {
                 status.setText("Microphone permission পাওয়া গেছে, Boss।");
                 if (setupAfterAudioPermission) {
@@ -488,6 +607,12 @@ public class MainActivity extends Activity {
                 status.setText("Camera permission দেওয়া হয়নি, তাই flashlight চালাতে পারছি না।");
             }
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshAssistantSetupLabel();
     }
 
     @Override
