@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
     private boolean setupAfterAudioPermission = false;
     private String pendingCameraAction;
     private String pendingWriteSettingsAction;
+    private boolean pendingAssistantStart = false;
     private final ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
     @Override
@@ -97,9 +98,8 @@ public class MainActivity extends Activity {
         initializeSpeechRecognizer();
         if (recognizer == null) {
             status.setText("এই ডিভাইসে Speech Recognition পাওয়া যায়নি।");
-        } else if (getIntent().getBooleanExtra(EXTRA_START_LISTENING, false)) {
-            startListening();
         }
+        pendingAssistantStart = getIntent().getBooleanExtra(EXTRA_START_LISTENING, false);
         refreshAssistantSetupLabel();
         requestCorePermissions();
     }
@@ -627,6 +627,12 @@ public class MainActivity extends Activity {
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         if (requestCode == CORE_PERMISSIONS) {
             refreshAssistantSetupLabel();
+            if (pendingAssistantStart
+                    && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED) {
+                pendingAssistantStart = false;
+                startListening();
+            }
             requestDefaultAssistantRole();
         } else if (requestCode == AUDIO_PERMISSION) {
             if (granted) {
@@ -670,6 +676,12 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ROLE_REQUEST) {
             refreshAssistantSetupLabel();
+            if (pendingAssistantStart
+                    && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED) {
+                pendingAssistantStart = false;
+                startListening();
+            }
             if (resultCode == RESULT_OK) {
                 status.setText("RS-কে Default Assistant হিসেবে নির্বাচন করেছেন, Boss।");
             } else {
