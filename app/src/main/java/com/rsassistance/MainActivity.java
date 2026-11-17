@@ -422,9 +422,7 @@ public class MainActivity extends Activity {
         boolean running = getSharedPreferences("rs_wake_state", MODE_PRIVATE)
                 .getBoolean("running", false);
         if (running) {
-            Intent stop = new Intent(this, RsWakeWordService.class);
-            stop.setAction(RsWakeWordService.ACTION_STOP);
-            startService(stop);
+            stopService(new Intent(this, RsWakeWordService.class));
             status.setText("Background Wake বন্ধ করেছি, Boss।");
             refreshAssistantSetupLabel();
             return;
@@ -588,9 +586,8 @@ public class MainActivity extends Activity {
     private void toggleSleepMode() {
         sleeping = !sleeping;
         if (sleeping) {
-            Intent stopWake = new Intent(this, RsWakeWordService.class);
-            stopWake.setAction(RsWakeWordService.ACTION_STOP);
-            try { startService(stopWake); } catch (Exception ignored) {}
+            try { stopService(new Intent(this, RsWakeWordService.class)); }
+            catch (Exception ignored) {}
             if (recognizer != null) recognizer.cancel();
             if (tts != null) tts.stop();
             face.setEmotion(AssistantFaceView.Emotion.SLEEPING);
