@@ -76,13 +76,13 @@ public final class RsActionController {
             adjustVolume(activity, AudioManager.ADJUST_LOWER);
             return Result.done("ভলিউম একটু কমিয়ে দিয়েছি, Boss।");
         }
-        if (containsAny(q, "mute", "sound off", "নিঃশব্দ", "শব্দ বন্ধ", "সাউন্ড বন্ধ")) {
-            adjustVolume(activity, AudioManager.ADJUST_MUTE);
-            return Result.done("মিডিয়া সাউন্ড মিউট করেছি, Boss।");
-        }
         if (containsAny(q, "unmute", "sound on", "শব্দ চালু", "সাউন্ড চালু")) {
             adjustVolume(activity, AudioManager.ADJUST_UNMUTE);
             return Result.done("মিডিয়া সাউন্ড আবার চালু করেছি, Boss।");
+        }
+        if (containsAny(q, "mute", "sound off", "নিঃশব্দ", "শব্দ বন্ধ", "সাউন্ড বন্ধ")) {
+            adjustVolume(activity, AudioManager.ADJUST_MUTE);
+            return Result.done("মিডিয়া সাউন্ড মিউট করেছি, Boss।");
         }
 
         if (containsAny(q, "battery", "charge", "চার্জ", "ব্যাটারি")) {
