@@ -7,6 +7,8 @@ import android.app.role.RoleManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.ComponentName;
+import android.database.Cursor;
+import android.provider.ContactsContract;
 import android.net.Uri;
 import android.provider.Settings.Secure;
 import android.graphics.Color;
@@ -30,6 +32,8 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
     public static final String EXTRA_START_LISTENING = "rs_start_listening";
@@ -37,6 +41,7 @@ public class MainActivity extends Activity {
     private static final int CAMERA_PERMISSION = 42;
     private static final int ROLE_REQUEST = 43;
     private static final int CORE_PERMISSIONS = 44;
+    private static final int CONTACTS_PERMISSION = 45;
 
     private TextView status;
     private TextView modeLabel;
@@ -56,6 +61,7 @@ public class MainActivity extends Activity {
     private String pendingCameraAction;
     private String pendingWriteSettingsAction;
     private boolean pendingAssistantStart = false;
+    private String pendingWhatsAppCommand;
     private final ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
     @Override
@@ -379,6 +385,10 @@ public class MainActivity extends Activity {
                 != PackageManager.PERMISSION_GRANTED) {
             missing.add(Manifest.permission.CAMERA);
         }
+        if (checkSelfPermission(Manifest.permission.READ_CONTACTS)
+                != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.READ_CONTACTS);
+        }
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -542,6 +552,8 @@ public class MainActivity extends Activity {
         status.setText("আপনি: " + spoken + "\n\nRS: বুঝছি, Boss…");
         face.setEmotion(AssistantFaceView.Emotion.THINKING);
 
+        if (handleWhatsAppMessageCommand(spoken)) return;
+
         RsActionController.Result action = RsActionController.execute(this, spoken);
         if (action.needsWriteSettings) {
             pendingWriteSettingsAction = spoken;
@@ -615,6 +627,133 @@ public class MainActivity extends Activity {
         return "en";
     }
 
+    private static final class WhatsAppDraft {
+        final String contact;
+        final String message;
+        WhatsAppDraft(String contact, String message) {
+            this.contact = contact;
+            this.message = message;
+        }
+    }
+
+    private boolean handleWhatsAppMessageCommand(String spoken) {
+        WhatsAppDraft draft = parseWhatsAppDraft(spoken);
+        if (draft == null) return false;
+        if (checkSelfPermission(Manifest.permission.READ_CONTACTS)
+                != PackageManager.PERMISSION_GRANTED) {
+            pendingWhatsAppCommand = spoken;
+            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS},
+                    CONTACTS_PERMISSION);
+            status.setText("WhatsApp message-এর recipient খুঁজতে Contacts permission দিন, Boss।");
+            return true;
+        }
+        findWhatsAppRecipient(draft);
+        return true;
+    }
+
+    private WhatsAppDraft parseWhatsAppDraft(String spoken) {
+        if (spoken == null) return null;
+        String q = spoken.trim();
+        Matcher english = Pattern.compile(
+                "(?i)^(?:send|whatsapp|message)\\s+(?:a\\s+)?(?:whatsapp\\s+)?(?:message\\s+)?to\\s+(.+?)\\s+(?:saying|message|text)\\s+(.+)$"
+        ).matcher(q);
+        if (english.find()) return new WhatsAppDraft(english.group(1).trim(), english.group(2).trim());
+
+        Matcher banglish = Pattern.compile(
+                "(?i)^whatsapp(?:\\s+e)?\\s+(.+?)\\s+ke\\s+(.+?)\\s+(?:pathao|send koro|bhejo)$"
+        ).matcher(q);
+        if (banglish.find()) return new WhatsAppDraft(banglish.group(1).trim(), banglish.group(2).trim());
+
+        Matcher bengali = Pattern.compile(
+                "হোয়াটসঅ্যাপে\\s*(.+?)\\s*কে\\s*(.+?)\\s*(?:পাঠাও|পাঠিয়ে দাও|পাঠিয়ে দাও)$"
+        ).matcher(q);
+        if (bengali.find()) return new WhatsAppDraft(bengali.group(1).trim(), bengali.group(2).trim());
+        return null;
+    }
+
+    private void findWhatsAppRecipient(WhatsAppDraft draft) {
+        ArrayList<String> names = new ArrayList<>();
+        ArrayList<String> numbers = new ArrayList<>();
+        Cursor cursor = null;
+        try {
+            String selection = ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ?";
+            String[] args = new String[]{"%" + draft.contact + "%"};
+            cursor = getContentResolver().query(
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    new String[]{
+                            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                            ContactsContract.CommonDataKinds.Phone.NUMBER
+                    },
+                    selection, args,
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+            );
+            if (cursor != null) {
+                while (cursor.moveToNext() && names.size() < 20) {
+                    String name = cursor.getString(0);
+                    String number = cursor.getString(1);
+                    if (name != null && number != null && !number.trim().isEmpty()) {
+                        if (!numbers.contains(number)) {
+                            names.add(name);
+                            numbers.add(number);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            status.setText("Contacts পড়তে সমস্যা হয়েছে, Boss।");
+            return;
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+
+        if (names.isEmpty()) {
+            status.setText("‘" + draft.contact + "’ নামে কোনো contact খুঁজে পেলাম না, Boss।");
+            return;
+        }
+        if (names.size() == 1) {
+            confirmWhatsAppDraft(names.get(0), numbers.get(0), draft.message);
+            return;
+        }
+        String[] choices = names.toArray(new String[0]);
+        new AlertDialog.Builder(this)
+                .setTitle("কোন contact-এ পাঠাব?")
+                .setItems(choices, (dialog, which) ->
+                        confirmWhatsAppDraft(names.get(which), numbers.get(which), draft.message))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void confirmWhatsAppDraft(String name, String rawNumber, String message) {
+        String digits = rawNumber.replaceAll("[^0-9+]", "");
+        if (digits.startsWith("00")) digits = digits.substring(2);
+        if (digits.startsWith("0")) digits = "88" + digits.substring(1);
+        final String phone = digits.replace("+", "");
+        if (phone.length() < 8) {
+            status.setText("এই contact-এর phone number ঠিক নেই, Boss।");
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("WhatsApp message পাঠাব?")
+                .setMessage("To: " + name + "\n\nMessage: " + message
+                        + "\n\nRS WhatsApp chat খুলবে। Send চাপার আগে আপনি message যাচাই করতে পারবেন।")
+                .setNegativeButton("না", null)
+                .setPositiveButton("WhatsApp খুলুন", (dialog, which) -> {
+                    try {
+                        Uri uri = Uri.parse("https://wa.me/" + phone + "?text=" + Uri.encode(message));
+                        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                        intent.setPackage("com.whatsapp");
+                        if (intent.resolveActivity(getPackageManager()) == null) {
+                            intent.setPackage(null);
+                        }
+                        startActivity(intent);
+                        status.setText(name + "-এর WhatsApp chat খুলে দিয়েছি, Boss। Send আপনাকেই চাপতে হবে।");
+                    } catch (Exception e) {
+                        status.setText("WhatsApp chat খুলতে পারলাম না, Boss।");
+                    }
+                })
+                .show();
+    }
+
     private void addTurn(String role, String content) {
         try {
             JSONObject turn = new JSONObject();
@@ -654,6 +793,14 @@ public class MainActivity extends Activity {
                 setupAfterAudioPermission = false;
                 autoStartAfterAudioPermission = false;
                 status.setText("Microphone permission ছাড়া voice assistant কাজ করবে না।");
+            }
+        } else if (requestCode == CONTACTS_PERMISSION) {
+            String pending = pendingWhatsAppCommand;
+            pendingWhatsAppCommand = null;
+            if (granted && pending != null) {
+                handleWhatsAppMessageCommand(pending);
+            } else {
+                status.setText("Contact permission দেওয়া হয়নি, তাই WhatsApp recipient খুঁজতে পারছি না।");
             }
         } else if (requestCode == CAMERA_PERMISSION) {
             String action = pendingCameraAction;
