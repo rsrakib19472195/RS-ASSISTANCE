@@ -177,3 +177,13 @@ Default branch: main
 - Cartesia may be used only if the user's account actually exposes the required cloning feature at $0 and the user accepts uploading the voice sample. Otherwise use Android built-in TTS immediately and evaluate open-source on-device engines (e.g. HayaiTTS/sherpa-onnx) for offline speech; model-by-model language support and voice cloning must be tested. No unverified claim that these engines clone Boss's voice in Bengali, English, and Hindi.
 - Development priority: (1) keep app buildable and improve existing Android foundation, (2) working free voice input/output, (3) core AI chat with a genuinely free/local option or clearly disclosed free-tier limits, (4) permissions-gated phone actions, (5) memory and notification integrations. Test each milestone on Boss's Android phone.
 - No paid APIs, subscriptions, or payment details without Boss's later explicit approval.
+
+
+## 2026-11-17 — Latest voice milestone (supersedes earlier Cartesia research notes above)
+- Boss has created a Cartesia account, reports a reusable Instant Voice Clone, and reports satisfactory Bangla/English/Hindi voice tests. This is based on Boss's account and listening tests; account entitlement and remaining free credits have not been independently verified.
+- Protected Cloudflare Worker deployed at `https://rs-assistance-api.tahmidjod19.workers.dev/`. Boss tested it via Hoppscotch: authenticated POST generated and played the cloned voice; GET correctly returned `POST required`.
+- Worker secrets are configured privately by Boss: `CARTESIA_API_KEY`, `RS_CARTESIA_VOICE_ID`, `RS_APP_TOKEN`. No secret values or voice ID belong in this repository.
+- Android app now has a Cartesia WAV playback client, calls the Worker for Bengali replies, and retains Android TextToSpeech as fallback. INTERNET permission added.
+- GitHub Actions reads repository secret `RS_APP_TOKEN` and passes it as a build property. Boss must add the same token privately under repository Settings → Secrets and variables → Actions → New repository secret (name `RS_APP_TOKEN`) before producing a functional test APK. If the original token was not retained, rotate it by setting a new random token in Cloudflare Worker secrets and GitHub Actions; do not send it in chat.
+- Prototype limitation: any token embedded in an APK can be extracted. This is not strong production authentication; add stronger device/session authentication and rate limiting before wider release.
+- Status: code committed; build and real-device integration are NOT yet verified. Cartesia free credits/entitlement remain subject to account limits. No paid upgrade or payment details permitted without Boss's explicit later approval.
