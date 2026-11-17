@@ -4,12 +4,14 @@ import android.app.Activity;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.TextView;
 import android.speech.tts.TextToSpeech;
+import android.widget.TextView;
 
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -19,7 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Calls the protected RS Worker for cloned-voice audio.
+ * Calls the protected RS Worker for cloned-voice MP3 audio.
  * Android TextToSpeech remains the fallback if the network/provider fails.
  */
 public final class CartesiaTtsClient {
@@ -31,6 +33,8 @@ public final class CartesiaTtsClient {
     public static void speak(Activity activity, String text, String language,
                              TextToSpeech fallback, AssistantFaceView face,
                              TextView status) {
+        if (activity == null || activity.isFinishing()) return;
+
         if (BuildConfig.RS_APP_TOKEN == null || BuildConfig.RS_APP_TOKEN.isEmpty()) {
             useFallback(text, fallback, face, status,
                     "Custom voice token is not configured; using device voice.");
@@ -49,7 +53,7 @@ public final class CartesiaTtsClient {
                 connection.setRequestProperty("Authorization",
                         "Bearer " + BuildConfig.RS_APP_TOKEN);
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                connection.setRequestProperty("Accept", "audio/wav");
+                connection.setRequestProperty("Accept", "audio/mpeg");
 
                 JSONObject body = new JSONObject();
                 body.put("transcript", text);
@@ -66,6 +70,11 @@ public final class CartesiaTtsClient {
                     throw new IllegalStateException("Voice backend HTTP " + code);
                 }
 
+                String contentType = connection.getContentType();
+                if (contentType == null || !contentType.toLowerCase().contains("audio/mpeg")) {
+                    throw new IllegalStateException("Worker response is not audio/mpeg");
+                }
+
                 byte[] audio;
                 try (InputStream input = connection.getInputStream();
                      ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
@@ -80,15 +89,17 @@ public final class CartesiaTtsClient {
                     audio = buffer.toByteArray();
                 }
 
-                if (audio.length < 44
-                        || audio[0] != 'R' || audio[1] != 'I'
-                        || audio[2] != 'F' || audio[3] != 'F'
-                        || audio[8] != 'W' || audio[9] != 'A'
-                        || audio[10] != 'V' || audio[11] != 'E') {
-                    throw new IllegalStateException("Worker did not return a valid RIFF/WAVE file");
+                // MP3 may begin with an ID3 tag or an MPEG frame; do not require a WAV/RIFF header.
+                if (audio.length < 128) {
+                    throw new IllegalStateException("MP3 response is empty or incomplete");
                 }
 
-                MAIN.post(() -> playAudio(activity, audio, text, fallback, face, status));
+                byte[] finalAudio = audio;
+                MAIN.post(() -> {
+                    if (!activity.isFinishing()) {
+                        playAudio(activity, finalAudio, text, fallback, face, status);
+                    }
+                });
             } catch (Exception error) {
                 MAIN.post(() -> useFallback(text, fallback, face, status,
                         "RS custom voice unavailable; using device voice."));
@@ -101,14 +112,15 @@ public final class CartesiaTtsClient {
     private static void playAudio(Activity activity, byte[] audio, String text,
                                   TextToSpeech fallback, AssistantFaceView face,
                                   TextView status) {
-        java.io.File file = null;
+        File file = null;
         MediaPlayer player = new MediaPlayer();
         try {
-            file = java.io.File.createTempFile("rs_voice_", ".wav", activity.getCacheDir());
-            try (java.io.FileOutputStream output = new java.io.FileOutputStream(file)) {
+            file = File.createTempFile("rs_voice_", ".mp3", activity.getCacheDir());
+            try (FileOutputStream output = new FileOutputStream(file)) {
                 output.write(audio);
             }
-            java.io.File audioFile = file;
+
+            File audioFile = file;
             player.setDataSource(audioFile.getAbsolutePath());
             player.setOnPreparedListener(mp -> {
                 try {
@@ -116,31 +128,30 @@ public final class CartesiaTtsClient {
                     mp.start();
                     if (status != null) status.setText("RS custom voice playing.");
                 } catch (Exception playbackError) {
-                    mp.release();
+                    try { mp.release(); } catch (Exception ignored) {}
                     audioFile.delete();
                     useFallback(text, fallback, face, status,
-                            "Audio start failed: " + playbackError.getClass().getSimpleName());
+                            "Audio start failed; using device voice.");
                 }
             });
             player.setOnCompletionListener(mp -> {
-                mp.release();
+                try { mp.release(); } catch (Exception ignored) {}
                 audioFile.delete();
-                face.setEmotion(AssistantFaceView.Emotion.IDLE);
+                if (face != null) face.setEmotion(AssistantFaceView.Emotion.IDLE);
             });
             player.setOnErrorListener((mp, what, extra) -> {
-                mp.release();
+                try { mp.release(); } catch (Exception ignored) {}
                 audioFile.delete();
                 useFallback(text, fallback, face, status,
-                        "Audio decoder error (" + what + "/" + extra + "); using device voice.");
+                        "MP3 playback error (" + what + "/" + extra + "); using device voice.");
                 return true;
             });
             player.prepareAsync();
         } catch (Exception error) {
-            player.release();
+            try { player.release(); } catch (Exception ignored) {}
             if (file != null) file.delete();
             useFallback(text, fallback, face, status,
-                    "Audio setup failed: " + error.getClass().getSimpleName()
-                            + (error.getMessage() == null ? "" : " — " + error.getMessage()));
+                    "Audio setup failed: " + error.getClass().getSimpleName());
         }
     }
 
