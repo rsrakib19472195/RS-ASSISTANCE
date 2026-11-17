@@ -1006,17 +1006,17 @@ public class MainActivity extends Activity {
         if (spoken == null) return null;
         String q = spoken.trim();
         Matcher english = Pattern.compile(
-                "(?i)^(?:please\\\\s+)?(?:call|phone|dial)\\\\s+(.+?)(?:\\\\s+now)?$"
+                "(?i)^(?:please\\s+)?(?:call|phone|dial)\\s+(.+?)(?:\\s+now)?$"
         ).matcher(q);
         if (english.find()) return new CallRequest(english.group(1).trim());
 
         Matcher banglish = Pattern.compile(
-                "(?i)^(.+?)\\\\s+ke\\\\s+(?:call|phone)\\\\s+(?:dao|daw|koro|korun)$"
+                "(?i)^(.+?)\\s+ke\\s+(?:call|phone)\\s+(?:dao|daw|koro|korun)$"
         ).matcher(q);
         if (banglish.find()) return new CallRequest(banglish.group(1).trim());
 
         Matcher bengali = Pattern.compile(
-                "(.+?)\\\\s*কে\\\\s*(?:কল|ফোন)\\\\s*(?:দাও|করো|করুন)$"
+                "(.+?)\\s*কে\\s*(?:কল|ফোন)\\s*(?:দাও|করো|করুন)$"
         ).matcher(q);
         if (bengali.find()) return new CallRequest(bengali.group(1).trim());
         return null;
