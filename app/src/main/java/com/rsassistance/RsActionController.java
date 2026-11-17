@@ -146,7 +146,9 @@ public final class RsActionController {
     }
 
     private static boolean isFlashlightOnCommand(String q) {
-        return containsAny(q, "on", "জ্বাল", "চালু", "jalao", "jalo", "জ্বালাও");
+        return containsAny(q, "torch on", "flashlight on", "torch jalao",
+                "flashlight jalao", "torch jalo", "flashlight jalo",
+                "টর্চ জ্বাল", "ফ্ল্যাশলাইট জ্বাল", "টর্চ চালু", "ফ্ল্যাশলাইট চালু");
     }
 
     private static void adjustVolume(Activity activity, int direction) {
