@@ -3,12 +3,15 @@ plugins { id 'com.android.application' }
 android {
     namespace 'com.rsassistance'
     compileSdk 35
+    buildFeatures { buildConfig true }
     defaultConfig {
         applicationId 'com.rsassistance'
         minSdk 23
         targetSdk 35
         versionCode 1
         versionName '1.0'
+        buildConfigField 'String', 'RS_API_BASE_URL', '"https://rs-assistance-api.tahmidjod19.workers.dev/"'
+        buildConfigField 'String', 'RS_APP_TOKEN', '"' + (project.findProperty('RS_APP_TOKEN') ?: '') + '"'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
