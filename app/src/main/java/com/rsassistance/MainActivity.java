@@ -690,6 +690,7 @@ public class MainActivity extends Activity {
             }
             if (resultCode == RESULT_OK) {
                 status.setText("RS-কে Default Assistant হিসেবে নির্বাচন করেছেন, Boss।");
+                if (!hasNotificationAccess()) requestNotificationAccess();
             } else {
                 status.setText("Default Assistant পরিবর্তন করা হয়নি। চাইলে পরে সেটআপ করতে পারবেন।");
             }
