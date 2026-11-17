@@ -459,6 +459,12 @@ public class MainActivity extends Activity {
             if (roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
                 status.setText("RS ইতিমধ্যেই আপনার Default Assistant, Boss।");
                 refreshAssistantSetupLabel();
+                if (pendingAssistantStart
+                        && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    pendingAssistantStart = false;
+                    startListening();
+                }
                 return;
             }
             startActivityForResult(
