@@ -109,7 +109,7 @@ public class RsWhatsAppSendAccessibilityService extends AccessibilityService {
 
     private String normalize(CharSequence value) {
         if (value == null) return "";
-        return value.toString().trim().replaceAll("\\\\s+", " ");
+        return value.toString().trim().replaceAll("\\s+", " ");
     }
 
     @Override
