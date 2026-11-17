@@ -293,6 +293,10 @@ public class MainActivity extends Activity {
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD");
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+        if (Build.VERSION.SDK_INT >= 34) {
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED, true);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED, true);
+        }
         try {
             recognizer.startListening(intent);
         } catch (IllegalStateException exception) {
@@ -420,7 +424,7 @@ public class MainActivity extends Activity {
                 status.setText("আপনি: " + spoken + "\n\nRS: " + reply);
                 face.setEmotion(AssistantFaceView.Emotion.HAPPY);
                 CartesiaTtsClient.speak(
-                        MainActivity.this, reply, "bn", tts, face, status
+                        MainActivity.this, reply, detectSpeechLanguage(reply), tts, face, status
                 );
             }
 
@@ -435,6 +439,17 @@ public class MainActivity extends Activity {
                 );
             }
         });
+    }
+
+    private String detectSpeechLanguage(String text) {
+        if (text == null) return "bn";
+        if (text.matches("(?s).*[\\u0900-\\u097F].*")) return "hi";
+        if (text.matches("(?s).*[\\u0980-\\u09FF].*")) return "bn";
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.matches("(?s).*(\\b(ami|tumi|apni|kemon|achi|ase|ache|korbo|koro|ki|keno|bhalo|na|hobe|dao|daw)\\b).*")) {
+            return "bn";
+        }
+        return "en";
     }
 
     private void addTurn(String role, String content) {
