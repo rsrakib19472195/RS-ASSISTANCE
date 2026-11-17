@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
     private static final int ROLE_REQUEST = 43;
     private static final int CORE_PERMISSIONS = 44;
     private static final int CONTACTS_PERMISSION = 45;
+    private static final int CALL_PERMISSION = 46;
 
     private TextView status;
     private TextView modeLabel;
@@ -65,6 +66,8 @@ public class MainActivity extends Activity {
     private boolean pendingStartWakeAfterPermission = false;
     private String pendingWhatsAppCommand;
     private String pendingCallCommand;
+    private String pendingCallNumber;
+    private String pendingCallName;
     private final ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
     @Override
@@ -830,7 +833,7 @@ public class MainActivity extends Activity {
         String q = spoken == null ? "" : spoken.toLowerCase(Locale.ROOT);
         if (containsAnyText(q, "who made you", "who created you", "who built you",
                 "who is your creator", "who is your developer", "developer ke",
-                "ke banaise", "ke banayse", "ke banayche", "ke toiri korse",
+                "ke banaise", "ke banaiche", "ke banayse", "ke banayche", "ke banaycho", "ke toiri korse",
                 "ke toiri koreche", "ke toiri korse", "toke ke banayse",
                 "তোমাকে কে বানিয়েছে", "তোমাকে কে বানিয়েছে", "তোমাকে কে তৈরি করেছে",
                 "কে বানিয়েছে তোমাকে", "কে বানিয়েছে তোমাকে", "কে তৈরি করেছে")) {
@@ -839,8 +842,8 @@ public class MainActivity extends Activity {
             return true;
         }
         if (containsAnyText(q, "about me", "what do you know about me", "who am i",
-                "amar somporke bolo", "amar bepare bolo", "amar porichoy dao",
-                "ami ke", "amake cheno", "আমার সম্পর্কে বল", "আমার ব্যাপারে বল",
+                "amar somporke bolo", "amar somporke bolbe", "amar bepare bolo", "amar bepare bolbe", "amar porichoy dao",
+                "ami ke", "amake cheno", "আমার সম্পর্কে বল", "আমার সম্পর্কে বলবে", "আমার ব্যাপারে বল", "আমার ব্যাপারে বলবে",
                 "আমাকে চেনো", "আমি কে", "আমার পরিচয় দাও", "আমার পরিচয় দাও")) {
             respondLocally(spoken,
                     "Boss, আপনি RS RAKIB। আপনি RS ASSISTANCE-এর creator ও developer। "
@@ -873,7 +876,7 @@ public class MainActivity extends Activity {
         boolean asksAboutMessages = containsAnyText(q,
                 "last message", "last msg", "recent message", "recent msg",
                 "who messaged", "what message", "what did", "message dise",
-                "msg dise", "ke msg", "ke message", "ki message", "ki msg",
+                "msg dise", "msg ke dise", "message ke dise", "ki msg dise", "ke msg", "ke message", "ki message", "ki msg",
                 "msg ashche", "message ashche", "message asche", "msg asche",
                 "ke pathaise", "ke pathiyeche", "ki likheche", "ki likhse",
                 "whatsapp inbox", "show inbox", "read inbox",
@@ -1021,18 +1024,39 @@ public class MainActivity extends Activity {
     private void confirmCall(String name, String number) {
         new AlertDialog.Builder(this)
                 .setTitle(name + "-কে call করবেন?")
-                .setMessage("RS ফোনের dialer খুলবে। নম্বরটি যাচাই করে Call চাপুন।\n" + number)
+                .setMessage("আপনি Confirm করলে RS call শুরু করবে।\n" + number)
                 .setNegativeButton("না", null)
-                .setPositiveButton("Dial", (dialog, which) -> {
-                    try {
-                        Intent dial = new Intent(Intent.ACTION_DIAL,
-                                Uri.fromParts("tel", number, null));
-                        startActivity(dial);
-                        status.setText(name + "-এর নম্বর dialer-এ খুলেছি, Boss।");
-                    } catch (Exception e) {
-                        status.setText("Dialer খুলতে পারলাম না, Boss।");
+                .setPositiveButton("Call Now", (dialog, which) -> {
+                    pendingCallName = name;
+                    pendingCallNumber = number;
+                    if (checkSelfPermission(Manifest.permission.CALL_PHONE)
+                            != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{Manifest.permission.CALL_PHONE},
+                                CALL_PERMISSION);
+                    } else {
+                        placePendingCall();
                     }
                 }).show();
+    }
+
+    private void placePendingCall() {
+        String name = pendingCallName;
+        String number = pendingCallNumber;
+        pendingCallName = null;
+        pendingCallNumber = null;
+        if (number == null || number.trim().isEmpty()) return;
+        try {
+            Intent call = new Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null));
+            startActivity(call);
+            status.setText((name == null ? "Call" : name + "-কে call") + " শুরু করেছি, Boss।");
+        } catch (SecurityException e) {
+            status.setText("Direct call permission পাওয়া যায়নি। Dialer খুলছি, Boss।");
+            try {
+                startActivity(new Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)));
+            } catch (Exception ignored) {}
+        } catch (Exception e) {
+            status.setText("এই মুহূর্তে call শুরু করতে পারলাম না, Boss।");
+        }
     }
 
     private static boolean containsAnyText(String value, String... parts) {
@@ -1102,6 +1126,19 @@ public class MainActivity extends Activity {
                 handleWhatsAppMessageCommand(pending);
             } else {
                 status.setText("Contact permission দেওয়া হয়নি, তাই contact খুঁজতে পারছি না।");
+            }
+        } else if (requestCode == CALL_PERMISSION) {
+            if (granted) {
+                placePendingCall();
+            } else {
+                String number = pendingCallNumber;
+                pendingCallNumber = null;
+                pendingCallName = null;
+                status.setText("Direct call permission দেওয়া হয়নি, Boss। চাইলে dialer-এ call করতে পারেন।");
+                if (number != null) {
+                    try { startActivity(new Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))); }
+                    catch (Exception ignored) {}
+                }
             }
         } else if (requestCode == CAMERA_PERMISSION) {
             String action = pendingCameraAction;
