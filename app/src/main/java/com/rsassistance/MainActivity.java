@@ -290,9 +290,9 @@ public class MainActivity extends Activity {
 
         face.setEmotion(emotion);
         status.setText("আপনি: " + spoken + "\n\nRS: " + reply);
-        if (tts != null) {
-            tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "rs_reply");
-        }
+        CartesiaTtsClient.speak(
+                this, reply, "bn", tts, face, status
+        );
     }
 
     private GradientDrawable rounded(int color, int radius) {
