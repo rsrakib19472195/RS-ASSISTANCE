@@ -293,10 +293,6 @@ public class MainActivity extends Activity {
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD");
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-        if (Build.VERSION.SDK_INT >= 34) {
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED, true);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED, true);
-        }
         try {
             recognizer.startListening(intent);
         } catch (IllegalStateException exception) {
