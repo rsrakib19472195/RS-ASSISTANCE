@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
     private Button notificationButton;
     private Button inboxButton;
     private Button autoReadButton;
+    private Button wakeButton;
     private AssistantFaceView face;
     private SpeechRecognizer recognizer;
     private TextToSpeech tts;
@@ -61,6 +62,7 @@ public class MainActivity extends Activity {
     private String pendingCameraAction;
     private String pendingWriteSettingsAction;
     private boolean pendingAssistantStart = false;
+    private boolean pendingStartWakeAfterPermission = false;
     private String pendingWhatsAppCommand;
     private final ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
@@ -279,6 +281,18 @@ public class MainActivity extends Activity {
         autoReadParams.topMargin = dp(5);
         root.addView(autoReadButton, autoReadParams);
 
+        wakeButton = new Button(this);
+        wakeButton.setText("Background Wake: OFF");
+        wakeButton.setTextColor(Color.WHITE);
+        wakeButton.setTextSize(11);
+        wakeButton.setAllCaps(false);
+        wakeButton.setBackground(rounded(0xFF183A34, dp(14)));
+        wakeButton.setOnClickListener(v -> toggleBackgroundWake());
+        LinearLayout.LayoutParams wakeParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(42));
+        wakeParams.topMargin = dp(5);
+        root.addView(wakeButton, wakeParams);
+
         setContentView(root);
     }
 
@@ -404,6 +418,45 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void toggleBackgroundWake() {
+        boolean running = getSharedPreferences("rs_wake_state", MODE_PRIVATE)
+                .getBoolean("running", false);
+        if (running) {
+            Intent stop = new Intent(this, RsWakeWordService.class);
+            stop.setAction(RsWakeWordService.ACTION_STOP);
+            startService(stop);
+            status.setText("Background Wake বন্ধ করেছি, Boss।");
+            refreshAssistantSetupLabel();
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED
+                || (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED)) {
+            pendingStartWakeAfterPermission = true;
+            requestCorePermissions();
+            return;
+        }
+        startBackgroundWakeService();
+    }
+
+    private void startBackgroundWakeService() {
+        try {
+            Intent start = new Intent(this, RsWakeWordService.class);
+            start.setAction(RsWakeWordService.ACTION_START);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(start);
+            } else {
+                startService(start);
+            }
+            status.setText("RS Background Wake চালু হয়েছে। Wake phrase: RS।");
+            refreshAssistantSetupLabel();
+        } catch (Exception e) {
+            status.setText("Background Wake চালু করা যায়নি। Microphone ও Notification permission পরীক্ষা করুন।");
+        }
+    }
+
     private void toggleWhatsAppAutoRead() {
         android.content.SharedPreferences prefs =
                 getSharedPreferences("rs_notification_store", MODE_PRIVATE);
@@ -502,6 +555,13 @@ public class MainActivity extends Activity {
             autoReadButton.setBackground(rounded(
                     enabled ? 0xFF176A4D : 0xFF49312E, dp(14)));
         }
+        if (wakeButton != null) {
+            boolean running = getSharedPreferences("rs_wake_state", MODE_PRIVATE)
+                    .getBoolean("running", false);
+            wakeButton.setText("Background Wake: " + (running ? "ON" : "OFF"));
+            wakeButton.setBackground(rounded(
+                    running ? 0xFF176A4D : 0xFF183A34, dp(14)));
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             RoleManager roleManager = getSystemService(RoleManager.class);
             if (roleManager != null && roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
@@ -528,6 +588,9 @@ public class MainActivity extends Activity {
     private void toggleSleepMode() {
         sleeping = !sleeping;
         if (sleeping) {
+            Intent stopWake = new Intent(this, RsWakeWordService.class);
+            stopWake.setAction(RsWakeWordService.ACTION_STOP);
+            try { startService(stopWake); } catch (Exception ignored) {}
             if (recognizer != null) recognizer.cancel();
             if (tts != null) tts.stop();
             face.setEmotion(AssistantFaceView.Emotion.SLEEPING);
@@ -537,6 +600,7 @@ public class MainActivity extends Activity {
             talkButton.setEnabled(false);
             talkButton.setAlpha(0.45f);
             modeButton.setText("জাগাও RS");
+            refreshAssistantSetupLabel();
         } else {
             face.setEmotion(AssistantFaceView.Emotion.IDLE);
             modeLabel.setText("● ACTIVE MODE");
@@ -772,6 +836,15 @@ public class MainActivity extends Activity {
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         if (requestCode == CORE_PERMISSIONS) {
             refreshAssistantSetupLabel();
+            if (pendingStartWakeAfterPermission
+                    && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED
+                    && (Build.VERSION.SDK_INT < 33
+                    || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    == PackageManager.PERMISSION_GRANTED)) {
+                pendingStartWakeAfterPermission = false;
+                startBackgroundWakeService();
+            }
             if (pendingAssistantStart
                     && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                     == PackageManager.PERMISSION_GRANTED) {
