@@ -60,3 +60,14 @@ Last updated: 2026-11-17
 
 ## Current Android fallback
 The Android app currently uses the platform TextToSpeech engine. Cartesia is not yet connected. Keep the fallback until the protected backend and real-device tests pass.
+
+
+## 2026-11-17 — Cartesia Worker proof-of-concept and Android client
+- Boss reports a Cartesia Instant Voice Clone is available and sounds satisfactory in Bangla, English, and Hindi. He successfully tested the protected Worker through Hoppscotch and heard the cloned voice.
+- Worker URL: `https://rs-assistance-api.tahmidjod19.workers.dev/`.
+- Worker secrets configured by Boss: `CARTESIA_API_KEY`, `RS_CARTESIA_VOICE_ID`, and `RS_APP_TOKEN`. Secret values are intentionally not recorded here.
+- Worker behavior was verified by Boss: GET returns `POST required`; an authenticated POST returns generated WAV audio. This confirms the user-reported backend path, not independent provider billing/credit status.
+- Android client code now calls the Worker for response audio and retains Android TextToSpeech as fallback. The client uses HTTPS, limits response buffering, and does not include the Cartesia API key.
+- Temporary app authentication token is injected at build time from the GitHub Actions secret named `RS_APP_TOKEN`. The same token must be added to repository Actions secrets before building a working test APK. Because the token is packaged in the APK, it can be extracted; this is temporary prototype protection only.
+- Android app integration is committed but not yet verified by a successful Actions build or on-device playback. Do not claim the app is speaking the clone until both tests pass.
+- Free-cost condition remains: no paid upgrade or payment details. Stop testing if Cartesia asks for payment or free credits are exhausted.
