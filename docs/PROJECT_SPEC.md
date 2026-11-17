@@ -108,3 +108,14 @@ Default branch: main
 - Later provide an ElevenLabs Voice ID and configure the API key privately in GitHub Secrets or a backend secret store. Never paste the API key into chat or commit it.
 - Later choose an AI provider/model and supply its credentials privately if needed.
 - Test APKs on the target Android phone and report actual results.
+
+
+## Progress log
+### 2026-11-17 — Initial specification and first UI increment
+- Added this durable product specification/checkpoint and linked it from README.
+- Added `AssistantFaceView.java`: a custom-drawn animated RS avatar with idle, listening, speaking, happy, thinking, concerned, surprised, and sleeping expression states.
+- Reworked `MainActivity.java` into a dark premium green RS interface with Boss greeting, voice-input button, expression updates, and an explicit Sleep/Wake UI control.
+- Sleep mode in this first UI increment cancels current speech recognition, stops TTS, and disables the in-app talk button. It is not yet a background service and has not been device-tested.
+- The existing Android SpeechRecognizer and device TTS remain as temporary prototype components; ElevenLabs and the AI brain are not connected.
+- GitHub Actions build for commit `9434c0a87986121c67696b2629813615c2444d2b` is running; do not mark the build successful until GitHub reports success.
+- Next checkpoint: verify the build, install on Boss's Android phone, inspect the new face/UI and Sleep/Wake behavior, then proceed with modular AI/backend and voice integration.
