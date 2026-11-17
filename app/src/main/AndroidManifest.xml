@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <queries>
         <intent>
@@ -44,6 +46,12 @@
                 android:name="android.voice_interaction"
                 android:resource="@xml/voice_interaction_service" />
         </service>
+
+        <service
+            android:name=".RsWakeWordService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="microphone" />
 
         <service
             android:name=".RsNotificationListenerService"
