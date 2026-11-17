@@ -187,3 +187,16 @@ Default branch: main
 - GitHub Actions reads repository secret `RS_APP_TOKEN` and passes it as a build property. Boss must add the same token privately under repository Settings → Secrets and variables → Actions → New repository secret (name `RS_APP_TOKEN`) before producing a functional test APK. If the original token was not retained, rotate it by setting a new random token in Cloudflare Worker secrets and GitHub Actions; do not send it in chat.
 - Prototype limitation: any token embedded in an APK can be extracted. This is not strong production authentication; add stronger device/session authentication and rate limiting before wider release.
 - Status: code committed; build and real-device integration are NOT yet verified. Cartesia free credits/entitlement remain subject to account limits. No paid upgrade or payment details permitted without Boss's explicit later approval.
+
+## 2026-11-17 — Android permission, assistant, and action integration update
+- First app launch now requests Android runtime permissions for microphone, camera/flashlight, contacts (WhatsApp recipient lookup), and notifications on Android 13+.
+- Android RoleManager request flow offers RS as the default assistant. Android still requires Boss to approve the system role picker; the app cannot silently assign itself.
+- Added a NotificationListenerService. After Boss enables Notification Access in Android Settings, RS stores notification previews locally. WhatsApp read-aloud is opt-in and off by default.
+- Added a WhatsApp draft flow for supported voice patterns: resolve a contact, show recipient/message confirmation, open the WhatsApp chat with the draft prefilled. RS does not press Send; Boss must review and send.
+- Added brightness up/down actions. Android requires the separate Modify System Settings approval before RS can change brightness.
+- Added an opt-in foreground microphone service for the “RS” wake phrase. It displays a persistent notification and stops when Sleep Mode is selected. Current prototype uses Android SpeechRecognizer in a restart loop; it is not a dedicated offline wake-word model, may depend on the device speech-recognition provider/network, and requires real-device privacy/battery testing.
+- Existing safe actions include flashlight, media volume, battery status, opening apps, Settings/Wi-Fi/Bluetooth Settings, and opening the Clock alarm setup UI.
+- Local conversation history is stored on-device and can be cleared from the app.
+- GitHub Actions Build #71 (run `44074511499`, commit `62d863c9827d84a94879582df92658f4ef3adeec`) completed successfully and uploaded `RS-ASSISTANCE-debug-apk`.
+- Important: successful compilation is not proof of real-device behavior. Default assistant selection, runtime/special permissions, speech recognition availability, WhatsApp notification parsing, wake phrase reliability, and battery use still require testing on Boss's Motorola phone.
+- Not yet implemented: true offline wake-word detection, accessibility-based cross-app UI control, robust natural-language action planning from the AI Brain, reminders/contacts/calls beyond the WhatsApp draft flow, and full end-to-end real-device verification. Do not describe these as complete.
