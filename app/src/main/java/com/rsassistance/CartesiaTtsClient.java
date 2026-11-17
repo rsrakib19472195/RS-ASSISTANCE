@@ -101,7 +101,7 @@ public final class CartesiaTtsClient {
                     }
                 });
             } catch (Exception error) {
-                MAIN.post(() -> useFallback(text, fallback, face, status,
+                MAIN.post(() -> useFallback(text, language, fallback, face, status,
                         "RS custom voice unavailable; using device voice."));
             } finally {
                 if (connection != null) connection.disconnect();
@@ -130,7 +130,7 @@ public final class CartesiaTtsClient {
                 } catch (Exception playbackError) {
                     try { mp.release(); } catch (Exception ignored) {}
                     audioFile.delete();
-                    useFallback(text, fallback, face, status,
+                    useFallback(text, language, fallback, face, status,
                             "Audio start failed; using device voice.");
                 }
             });
@@ -142,7 +142,7 @@ public final class CartesiaTtsClient {
             player.setOnErrorListener((mp, what, extra) -> {
                 try { mp.release(); } catch (Exception ignored) {}
                 audioFile.delete();
-                useFallback(text, fallback, face, status,
+                useFallback(text, language, fallback, face, status,
                         "MP3 playback error (" + what + "/" + extra + "); using device voice.");
                 return true;
             });
@@ -150,7 +150,7 @@ public final class CartesiaTtsClient {
         } catch (Exception error) {
             try { player.release(); } catch (Exception ignored) {}
             if (file != null) file.delete();
-            useFallback(text, fallback, face, status,
+            useFallback(text, language, fallback, face, status,
                     "Audio setup failed: " + error.getClass().getSimpleName());
         }
     }
