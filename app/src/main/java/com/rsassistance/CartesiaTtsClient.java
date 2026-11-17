@@ -160,6 +160,15 @@ public final class CartesiaTtsClient {
                                     String message) {
         if (status != null) status.setText(message);
         if (fallback != null) {
+            try {
+                if ("hi".equalsIgnoreCase(language)) {
+                    fallback.setLanguage(new java.util.Locale("hi", "IN"));
+                } else if ("en".equalsIgnoreCase(language)) {
+                    fallback.setLanguage(java.util.Locale.US);
+                } else {
+                    fallback.setLanguage(new java.util.Locale("bn", "BD"));
+                }
+            } catch (Exception ignored) {}
             fallback.speak(text, TextToSpeech.QUEUE_FLUSH, null, "rs_reply_fallback");
         }
         if (face != null) face.setEmotion(AssistantFaceView.Emotion.SPEAKING);
