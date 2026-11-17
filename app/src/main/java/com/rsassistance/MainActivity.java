@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
     private Button permissionsButton;
     private Button notificationButton;
     private Button inboxButton;
+    private Button autoReadButton;
     private AssistantFaceView face;
     private SpeechRecognizer recognizer;
     private TextToSpeech tts;
@@ -258,6 +259,18 @@ public class MainActivity extends Activity {
         accessControls.addView(inboxButton, inboxParams);
         root.addView(accessControls);
 
+        autoReadButton = new Button(this);
+        autoReadButton.setText("WhatsApp Auto Read: OFF");
+        autoReadButton.setTextColor(Color.WHITE);
+        autoReadButton.setTextSize(11);
+        autoReadButton.setAllCaps(false);
+        autoReadButton.setBackground(rounded(0xFF49312E, dp(14)));
+        autoReadButton.setOnClickListener(v -> toggleWhatsAppAutoRead());
+        LinearLayout.LayoutParams autoReadParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(42));
+        autoReadParams.topMargin = dp(5);
+        root.addView(autoReadButton, autoReadParams);
+
         setContentView(root);
     }
 
@@ -379,6 +392,17 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void toggleWhatsAppAutoRead() {
+        android.content.SharedPreferences prefs =
+                getSharedPreferences("rs_notification_store", MODE_PRIVATE);
+        boolean enabled = !prefs.getBoolean("whatsapp_auto_read", false);
+        prefs.edit().putBoolean("whatsapp_auto_read", enabled).apply();
+        refreshAssistantSetupLabel();
+        status.setText(enabled
+                ? "WhatsApp notification এলে RS পড়ে শোনাবে, Boss।"
+                : "WhatsApp auto-read বন্ধ করেছি, Boss।");
+    }
+
     private void requestNotificationAccess() {
         try {
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
@@ -452,6 +476,13 @@ public class MainActivity extends Activity {
         if (notificationButton != null) {
             notificationButton.setText(hasNotificationAccess()
                     ? "Notification ✓" : "Notification Access");
+        }
+        if (autoReadButton != null) {
+            boolean enabled = getSharedPreferences("rs_notification_store", MODE_PRIVATE)
+                    .getBoolean("whatsapp_auto_read", false);
+            autoReadButton.setText("WhatsApp Auto Read: " + (enabled ? "ON" : "OFF"));
+            autoReadButton.setBackground(rounded(
+                    enabled ? 0xFF176A4D : 0xFF49312E, dp(14)));
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             RoleManager roleManager = getSystemService(RoleManager.class);
