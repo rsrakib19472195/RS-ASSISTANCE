@@ -280,8 +280,10 @@ public class MainActivity extends Activity {
         String reply = "আমি আপনার কথা শুনেছি, Boss। আমার AI Brain এখনো সংযুক্ত হয়নি।";
         AssistantFaceView.Emotion emotion = AssistantFaceView.Emotion.IDLE;
 
-        if (normalized.contains("হ্যালো") || normalized.contains("hello")
-                || normalized.contains("সালাম")) {
+        if (normalized.contains("হ্যালো") || normalized.contains("hello")) {
+            reply = "হ্যালো Boss! আমি RS। কেমন আছেন? কীভাবে সাহায্য করতে পারি?";
+            emotion = AssistantFaceView.Emotion.HAPPY;
+        } else if (normalized.contains("সালাম")) {
             reply = "ওয়ালাইকুম আসসালাম Boss। আমি RS। কীভাবে সাহায্য করতে পারি?";
             emotion = AssistantFaceView.Emotion.HAPPY;
         } else if (normalized.contains("মন খারাপ")) {
