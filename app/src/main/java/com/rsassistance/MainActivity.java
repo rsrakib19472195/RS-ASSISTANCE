@@ -18,6 +18,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Locale;
 
@@ -32,6 +34,7 @@ public class MainActivity extends Activity {
     private SpeechRecognizer recognizer;
     private TextToSpeech tts;
     private boolean sleeping = false;
+    private final ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -276,29 +279,50 @@ public class MainActivity extends Activity {
     }
 
     private void handleSpeech(String spoken) {
-        String normalized = spoken.toLowerCase(Locale.ROOT);
-        String reply = "আমি আপনার কথা শুনেছি, Boss। আমার AI Brain এখনো সংযুক্ত হয়নি।";
-        AssistantFaceView.Emotion emotion = AssistantFaceView.Emotion.IDLE;
+        status.setText("আপনি: " + spoken + "\n\nRS: ভাবছি, Boss…");
+        face.setEmotion(AssistantFaceView.Emotion.THINKING);
 
-        if (normalized.contains("হ্যালো") || normalized.contains("hello")) {
-            reply = "হ্যালো Boss! আমি RS। কেমন আছেন? কীভাবে সাহায্য করতে পারি?";
-            emotion = AssistantFaceView.Emotion.HAPPY;
-        } else if (normalized.contains("সালাম")) {
-            reply = "ওয়ালাইকুম আসসালাম Boss। আমি RS। কীভাবে সাহায্য করতে পারি?";
-            emotion = AssistantFaceView.Emotion.HAPPY;
-        } else if (normalized.contains("মন খারাপ")) {
-            reply = "কী হয়েছে Boss? চাইলে আমাকে বলতে পারেন। আমি মন দিয়ে শুনছি।";
-            emotion = AssistantFaceView.Emotion.CONCERNED;
-        } else if (normalized.contains("ধন্যবাদ")) {
-            reply = "আপনাকে স্বাগতম Boss। সাহায্য করতে পেরে ভালো লাগল।";
-            emotion = AssistantFaceView.Emotion.HAPPY;
+        JSONArray history = new JSONArray();
+        int start = Math.max(0, conversationHistory.size() - 8);
+        for (int i = start; i < conversationHistory.size(); i++) {
+            history.put(conversationHistory.get(i));
         }
 
-        face.setEmotion(emotion);
-        status.setText("আপনি: " + spoken + "\n\nRS: " + reply);
-        CartesiaTtsClient.speak(
-                this, reply, "bn", tts, face, status
-        );
+        try {
+            JSONObject userTurn = new JSONObject();
+            userTurn.put("role", "user");
+            userTurn.put("content", spoken);
+            conversationHistory.add(userTurn);
+        } catch (Exception ignored) {}
+
+        RsBrainClient.ask(this, spoken, history, new RsBrainClient.Callback() {
+            @Override public void onSuccess(String reply) {
+                try {
+                    JSONObject assistantTurn = new JSONObject();
+                    assistantTurn.put("role", "assistant");
+                    assistantTurn.put("content", reply);
+                    conversationHistory.add(assistantTurn);
+                    while (conversationHistory.size() > 16) {
+                        conversationHistory.remove(0);
+                    }
+                } catch (Exception ignored) {}
+
+                status.setText("আপনি: " + spoken + "\n\nRS: " + reply);
+                face.setEmotion(AssistantFaceView.Emotion.HAPPY);
+                CartesiaTtsClient.speak(
+                        MainActivity.this, reply, "bn", tts, face, status
+                );
+            }
+
+            @Override public void onError(String message) {
+                String reply = "দুঃখিত Boss, এই মুহূর্তে আমার Brain-এর সঙ্গে সংযোগ হচ্ছে না। একটু পরে আবার চেষ্টা করুন।";
+                status.setText("আপনি: " + spoken + "\n\nRS: " + reply + "\n" + message);
+                face.setEmotion(AssistantFaceView.Emotion.CONCERNED);
+                CartesiaTtsClient.speak(
+                        MainActivity.this, reply, "bn", tts, face, status
+                );
+            }
+        });
     }
 
     private GradientDrawable rounded(int color, int radius) {
