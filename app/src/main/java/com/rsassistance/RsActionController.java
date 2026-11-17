@@ -24,17 +24,21 @@ public final class RsActionController {
     public static final class Result {
         public final boolean handled;
         public final boolean needsCameraPermission;
+        public final boolean needsWriteSettings;
         public final String message;
 
-        private Result(boolean handled, boolean needsCameraPermission, String message) {
+        private Result(boolean handled, boolean needsCameraPermission,
+                       boolean needsWriteSettings, String message) {
             this.handled = handled;
             this.needsCameraPermission = needsCameraPermission;
+            this.needsWriteSettings = needsWriteSettings;
             this.message = message;
         }
 
-        static Result notHandled() { return new Result(false, false, ""); }
-        static Result permission() { return new Result(false, true, ""); }
-        static Result done(String message) { return new Result(true, false, message); }
+        static Result notHandled() { return new Result(false, false, false, ""); }
+        static Result permission() { return new Result(false, true, false, ""); }
+        static Result writeSettingsPermission() { return new Result(false, false, true, ""); }
+        static Result done(String message) { return new Result(true, false, false, message); }
     }
 
     private RsActionController() {}
@@ -83,6 +87,34 @@ public final class RsActionController {
         if (containsAny(q, "mute", "sound off", "নিঃশব্দ", "শব্দ বন্ধ", "সাউন্ড বন্ধ")) {
             adjustVolume(activity, AudioManager.ADJUST_MUTE);
             return Result.done("মিডিয়া সাউন্ড মিউট করেছি, Boss।");
+        }
+
+        if (containsAny(q, "brightness", "screen light", "display light",
+                "উজ্জ্বলতা", "স্ক্রিনের আলো", "ডিসপ্লের আলো")) {
+            boolean increase = containsAny(q, "up", "increase", "higher", "বাড়াও",
+                    "বাড়াও", "বাড়িয়ে", "বাড়িয়ে", "বেশি", "barাও", "barao");
+            boolean decrease = containsAny(q, "down", "decrease", "lower", "কমাও",
+                    "কমিয়ে", "কমিয়ে", "komao");
+            if (!increase && !decrease) {
+                return Result.done("স্ক্রিনের আলো বাড়াব নাকি কমাব, Boss?");
+            }
+            if (!Settings.System.canWrite(activity)) return Result.writeSettingsPermission();
+            try {
+                int current = Settings.System.getInt(activity.getContentResolver(),
+                        Settings.System.SCREEN_BRIGHTNESS);
+                int next = Math.max(10, Math.min(255, current + (increase ? 35 : -35)));
+                Settings.System.putInt(activity.getContentResolver(),
+                        Settings.System.SCREEN_BRIGHTNESS_MODE,
+                        Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
+                boolean saved = Settings.System.putInt(activity.getContentResolver(),
+                        Settings.System.SCREEN_BRIGHTNESS, next);
+                return Result.done(saved
+                        ? (increase ? "স্ক্রিনের আলো বাড়িয়ে দিয়েছি, Boss।"
+                        : "স্ক্রিনের আলো কমিয়ে দিয়েছি, Boss।")
+                        : "স্ক্রিনের আলো পরিবর্তন করা যায়নি, Boss।");
+            } catch (Exception e) {
+                return Result.done("স্ক্রিনের আলো পরিবর্তন করতে পারিনি, Boss।");
+            }
         }
 
         if (containsAny(q, "battery", "charge", "চার্জ", "ব্যাটারি")) {
