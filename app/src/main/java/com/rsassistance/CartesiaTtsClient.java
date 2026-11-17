@@ -80,8 +80,12 @@ public final class CartesiaTtsClient {
                     audio = buffer.toByteArray();
                 }
 
-                if (audio.length < 44) {
-                    throw new IllegalStateException("Invalid WAV response");
+                if (audio.length < 44
+                        || audio[0] != 'R' || audio[1] != 'I'
+                        || audio[2] != 'F' || audio[3] != 'F'
+                        || audio[8] != 'W' || audio[9] != 'A'
+                        || audio[10] != 'V' || audio[11] != 'E') {
+                    throw new IllegalStateException("Worker did not return a valid RIFF/WAVE file");
                 }
 
                 MAIN.post(() -> playAudio(activity, audio, text, fallback, face, status));
@@ -107,8 +111,16 @@ public final class CartesiaTtsClient {
             java.io.File audioFile = file;
             player.setDataSource(audioFile.getAbsolutePath());
             player.setOnPreparedListener(mp -> {
-                face.setEmotion(AssistantFaceView.Emotion.SPEAKING);
-                mp.start();
+                try {
+                    if (face != null) face.setEmotion(AssistantFaceView.Emotion.SPEAKING);
+                    mp.start();
+                    if (status != null) status.setText("RS custom voice playing.");
+                } catch (Exception playbackError) {
+                    mp.release();
+                    audioFile.delete();
+                    useFallback(text, fallback, face, status,
+                            "Audio start failed: " + playbackError.getClass().getSimpleName());
+                }
             });
             player.setOnCompletionListener(mp -> {
                 mp.release();
@@ -119,7 +131,7 @@ public final class CartesiaTtsClient {
                 mp.release();
                 audioFile.delete();
                 useFallback(text, fallback, face, status,
-                        "Audio playback failed; using device voice.");
+                        "Audio decoder error (" + what + "/" + extra + "); using device voice.");
                 return true;
             });
             player.prepareAsync();
@@ -127,7 +139,8 @@ public final class CartesiaTtsClient {
             player.release();
             if (file != null) file.delete();
             useFallback(text, fallback, face, status,
-                    "Audio playback failed; using device voice.");
+                    "Audio setup failed: " + error.getClass().getSimpleName()
+                            + (error.getMessage() == null ? "" : " — " + error.getMessage()));
         }
     }
 
