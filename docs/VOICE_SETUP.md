@@ -71,3 +71,9 @@ The Android app currently uses the platform TextToSpeech engine. Cartesia is not
 - Temporary app authentication token is injected at build time from the GitHub Actions secret named `RS_APP_TOKEN`. The same token must be added to repository Actions secrets before building a working test APK. Because the token is packaged in the APK, it can be extracted; this is temporary prototype protection only.
 - Android app integration is committed but not yet verified by a successful Actions build or on-device playback. Do not claim the app is speaking the clone until both tests pass.
 - Free-cost condition remains: no paid upgrade or payment details. Stop testing if Cartesia asks for payment or free credits are exhausted.
+
+
+## 2026-11-17 — Repository secret corrected
+- Boss reports that the GitHub repository Actions secret `RS_APP_TOKEN` has now been corrected and saved under Repository secrets (not Environment secrets).
+- Trigger a fresh Android build after this change so the build-time `BuildConfig.RS_APP_TOKEN` receives the repository secret.
+- A successful build alone does not prove the token was injected; confirm on the installed APK that the missing-token fallback message is gone, then verify cloned-voice playback.
