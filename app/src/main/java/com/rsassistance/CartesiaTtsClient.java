@@ -36,7 +36,7 @@ public final class CartesiaTtsClient {
         if (activity == null || activity.isFinishing()) return;
 
         if (BuildConfig.RS_APP_TOKEN == null || BuildConfig.RS_APP_TOKEN.isEmpty()) {
-            useFallback(text, fallback, face, status,
+            useFallback(text, language, fallback, face, status,
                     "Custom voice token is not configured; using device voice.");
             return;
         }
@@ -97,7 +97,7 @@ public final class CartesiaTtsClient {
                 byte[] finalAudio = audio;
                 MAIN.post(() -> {
                     if (!activity.isFinishing()) {
-                        playAudio(activity, finalAudio, text, fallback, face, status);
+                        playAudio(activity, finalAudio, text, language, fallback, face, status);
                     }
                 });
             } catch (Exception error) {
@@ -109,7 +109,7 @@ public final class CartesiaTtsClient {
         });
     }
 
-    private static void playAudio(Activity activity, byte[] audio, String text,
+    private static void playAudio(Activity activity, byte[] audio, String text, String language,
                                   TextToSpeech fallback, AssistantFaceView face,
                                   TextView status) {
         File file = null;
@@ -155,7 +155,7 @@ public final class CartesiaTtsClient {
         }
     }
 
-    private static void useFallback(String text, TextToSpeech fallback,
+    private static void useFallback(String text, String language, TextToSpeech fallback,
                                     AssistantFaceView face, TextView status,
                                     String message) {
         if (status != null) status.setText(message);
