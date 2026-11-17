@@ -101,7 +101,6 @@ public class RsWakeWordService extends Service {
         String lower = phrase.toLowerCase(Locale.ROOT).trim();
         String compact = lower.replaceAll("[^\\p{L}\\p{N}]", "");
         return compact.contains("আরএস")
-                || compact.contains("আরএส")
                 || lower.matches(".*\\brs\\b.*")
                 || lower.startsWith("hey rs")
                 || lower.startsWith("hello rs");
