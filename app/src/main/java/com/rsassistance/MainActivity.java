@@ -46,6 +46,10 @@ public class MainActivity extends Activity {
                 if (languageResult == TextToSpeech.LANG_MISSING_DATA
                         || languageResult == TextToSpeech.LANG_NOT_SUPPORTED) {
                     status.setText("এই ডিভাইসে বাংলা TTS পাওয়া যাচ্ছে না।");
+                } else {
+                    String welcome = "আসসালামু আলাইকুম Boss! আমি RS। আপনাকে স্বাগতম।";
+                    status.setText("আসসালামু আলাইকুম, Boss। আমি আপনার জন্য প্রস্তুত।");
+                    CartesiaTtsClient.speak(this, welcome, "bn", tts, face, status);
                 }
             }
         });
